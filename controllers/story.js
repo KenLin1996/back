@@ -1,11 +1,11 @@
 import Story from "../models/story.js";
-import User from "../models/user.js";
 import { StatusCodes } from "http-status-codes";
 import validator from "validator";
 
 export const create = async (req, res) => {
   try {
     req.body.image = req.file.path;
+    const now = Date.now();
     const result = await Story.create({
       mainAuthor: req.user._id,
       // supportAuthor: req.body.supportAuthor,
@@ -28,8 +28,8 @@ export const create = async (req, res) => {
       show: req.body.show,
       image: req.body.image,
       voteTime: req.body.voteTime,
-      voteStart: req.body.voteStart,
-      voteEnd: req.body.voteEnd,
+      voteStart: now,
+      voteEnd: now + req.body.voteTime * 1,
       views: req.body.views,
       collectionNum: req.body.collectionNum,
       followNum: req.body.followNum,
@@ -57,67 +57,6 @@ export const create = async (req, res) => {
     }
   }
 };
-
-// const mergeTopVotedContent = async (storyId) => {
-//   const story = await Story.findById(storyId).populate("content");
-//   if (story) {
-//     const topVotedContent = story.content.sort(
-//       (a, b) => b.voteCount - a.voteCount
-//     )[0];
-
-//     if (topVotedContent) {
-//       topVotedContent.main = true;
-//       await topVotedContent.save();
-//       story.latestContent = topVotedContent;
-//       await story.save();
-//       console.log(`Top voted content merged into the story: ${story.title}`);
-//     } else {
-//       console.log("No content found for voting.");
-//     }
-//   } else {
-//     console.log("Story not found.");
-//   }
-// };
-
-// export const extendStory = async (req, res) => {
-//   try {
-//     const storyId = req.params.id;
-
-//     const updatedStory = await Story.findByIdAndUpdate(
-//       storyId,
-//       { $push: { extensions: req.body } }, // 使用 $push 操作符來追加內容
-//       { new: true } // 返回更新後的文檔
-//     );
-
-//     if (!updatedStory) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "故事未找到",
-//       });
-//     }
-
-//     res.status(200).json({
-//       success: true,
-//       message: "延伸內容提交成功",
-//       result: updatedStory,
-//     });
-//   } catch (error) {
-//     console.log(error);
-//     if (error.name === "ValidationError") {
-//       const key = Object.keys(error.errors)[0];
-//       const message = error.errors[key].message;
-//       res.status(StatusCodes.BAD_REQUEST).json({
-//         success: false,
-//         message,
-//       });
-//     } else {
-//       res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-//         success: false,
-//         message: "未知錯誤",
-//       });
-//     }
-//   }
-// };
 
 export const extendStory = async (req, res) => {
   try {
