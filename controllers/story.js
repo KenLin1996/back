@@ -2,6 +2,7 @@ import Story from "../models/story.js";
 import { StatusCodes } from "http-status-codes";
 import validator from "validator";
 
+// post
 export const create = async (req, res) => {
   try {
     req.body.image = req.file.path;
@@ -60,31 +61,33 @@ export const create = async (req, res) => {
 
 export const extendStory = async (req, res) => {
   try {
+    console.log(req.body);
     const storyId = req.params.id;
-    const { chapterName, content } = req.body;
+    const { chapterName, content, voteCount } = req.body;
     const userId = req.user._id;
 
-    console.log("Received story extension request:", {
-      storyId,
-      chapterName,
-      content,
-      userId,
-    });
+    // console.log("Received story extension request:", {
+    //   storyId,
+    //   chapterName,
+    //   content,
+    //   userId,
+    // });
 
     const newExtension = {
       chapterName,
       content: [{ latestContent: content }],
-      voteCount: 0,
+      voteCount: voteCount,
       author: userId,
     };
 
     const story = await Story.findById(storyId);
     story.extensions.push(newExtension);
+
+    await story.save();
+
     res
       .status(200)
       .json({ success: true, message: "Story extension added successfully." });
-
-    await story.save();
   } catch (error) {
     console.log(error);
     if (error.name === "ValidationError") {
@@ -103,6 +106,7 @@ export const extendStory = async (req, res) => {
   }
 };
 
+// get
 export const get = async (req, res) => {
   try {
     const sortBy = req.query.sortBy || "createdAt";
@@ -202,6 +206,7 @@ export const getId = async (req, res) => {
   }
 };
 
+// patch
 export const edit = async (req, res) => {
   try {
     if (!validator.isMongoId(req.params.id)) throw new Error("ID");
@@ -243,11 +248,14 @@ export const edit = async (req, res) => {
 };
 
 export const updateVoteTime = async (req, res) => {
-  const { storyId } = req.params;
+  const storyId = req.params.id;
   const { voteStart, voteEnd } = req.body;
+  console.log(req.body);
+  console.log(req.params.id);
   try {
     // 檢查故事是否存在
     const story = await Story.findById(storyId);
+
     if (!story) {
       return res.status(404).json({ message: "Story not found" });
     }
@@ -265,6 +273,116 @@ export const updateVoteTime = async (req, res) => {
   }
 };
 
+// export const updateVoteCount = async (req, res) => {
+//   const { storyId, extensionId } = req.params;
+//   const { voteCountChange } = req.body;
+
+//   try {
+//     // 查找指定的故事
+//     const story = await Story.findById(storyId);
+//     if (!story) {
+//       return res.status(404).json({ message: "找不到故事" });
+//     }
+
+//     // 找到指定的擴展
+//     const extidx = story.extensions.findIndex(
+//       (ext) => ext._id.toString() === extensionId
+//     );
+//     if (extidx === -1) {
+//       return res.status(404).json({ message: "找不到此延伸故事" });
+//     }
+
+//     // const hasVotedInOtherExtension = story.extensions.some((ext) =>
+//     //   ext.voteCount.includes(req.user._id)
+//     // );
+//     const hasVotedInOtherExtension = story.extensions.some(
+//       (ext) =>
+//         ext.voteCount.includes(req.user._id) &&
+//         ext._id.toString() !== extensionId
+//     );
+
+//     if (voteCountChange === 1) {
+//       if (
+//         !story.extensions[extidx].voteCount.includes(req.user._id) &&
+//         !hasVotedInOtherExtension
+//       ) {
+//         story.extensions[extidx].voteCount.push(req.user._id);
+//       }
+//     } else if (voteCountChange === -1) {
+//       const vidx = story.extensions[extidx].voteCount.findIndex(
+//         (v) => v.toString() === req.user._id.toString()
+//       );
+//       if (vidx > -1) {
+//         story.extensions[extidx].voteCount.splice(vidx, 1);
+//       }
+//     }
+
+//     await story.save();
+//     res.status(StatusCodes.OK).json({
+//       success: true,
+//       message: "已經成功投票",
+//       hasVotedInOtherExtension,
+//     });
+//   } catch (error) {
+//     console.log(error);
+//   }
+// };
+
+export const updateVoteCount = async (req, res) => {
+  const { storyId, extensionId } = req.params;
+  const { voteCountChange } = req.body;
+
+  try {
+    // 查找指定的故事
+    const story = await Story.findById(storyId);
+    if (!story) {
+      return res.status(404).json({ message: "找不到故事" });
+    }
+
+    // 找到指定的扩展
+    const extidx = story.extensions.findIndex(
+      (ext) => ext._id.toString() === extensionId
+    );
+    if (extidx === -1) {
+      return res.status(404).json({ message: "找不到此延伸故事" });
+    }
+
+    // 确认用户是否在其他扩展中投过票
+    const hasVotedInOtherExtension = story.extensions.some(
+      (ext) =>
+        ext.voteCount.includes(req.user._id) &&
+        ext._id.toString() !== extensionId
+    );
+
+    if (voteCountChange === 1) {
+      if (
+        !story.extensions[extidx].voteCount.includes(req.user._id) &&
+        !hasVotedInOtherExtension
+      ) {
+        story.extensions[extidx].voteCount.push(req.user._id);
+      }
+    } else if (voteCountChange === -1) {
+      const vidx = story.extensions[extidx].voteCount.findIndex(
+        (v) => v.toString() === req.user._id.toString()
+      );
+      if (vidx > -1) {
+        story.extensions[extidx].voteCount.splice(vidx, 1);
+      }
+    }
+
+    await story.save();
+    res.status(200).json({
+      success: true,
+      message: "已經成功投票",
+      hasVotedInOtherExtension, // 这里返回的值根据逻辑动态设置
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "服务器错误" });
+  }
+};
+
+// delete
 export const deleteId = async (req, res) => {
   try {
     // 使用 validator.isMongoId 來驗證請求參數中的故事 ID 是否符合  ObjectId 格式。如果不符合，會拋出一個 ID 錯誤

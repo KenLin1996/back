@@ -40,11 +40,13 @@ export const login = async (req, res) => {
       expiresIn: "7 days",
     });
     req.user.tokens.push(token);
+    const userId = req.user._id;
     await req.user.save();
     res.status(StatusCodes.OK).json({
       success: true,
       message: "",
       result: {
+        userId,
         token,
         email: req.user.email,
         username: req.user.username,
@@ -61,6 +63,31 @@ export const login = async (req, res) => {
       success: false,
       message: "未知錯誤",
     });
+  }
+};
+
+export const addMark = async (req, res) => {
+  try {
+    const userId = req.user._ud;
+    const { storyId } = req.body;
+    const user = await User.findById(userId).populate("bookmarkStory");
+    if (user.bookmarkStory.some((book) => book._id.toString() === storyId)) {
+      user.bookmarkStory = user.bookmarkStory.filter(
+        (book) => book._id.toString() !== storyId
+      );
+    } else {
+      console.log(user);
+      user.bookmarkStory.push(storyId);
+    }
+    await user.save();
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: "成功收藏",
+      result,
+    });
+  } catch (error) {
+    console.log(error);
+    req.status(500).json({ message: "伺服器錯誤" });
   }
 };
 
@@ -88,10 +115,12 @@ export const extend = async (req, res) => {
 
 export const profile = (req, res) => {
   try {
+    const userId = req.user._id;
     res.status(StatusCodes.OK).json({
       success: true,
       message: "",
       result: {
+        userId,
         avatar: req.user.avatar,
         email: req.user.email,
         username: req.user.username,

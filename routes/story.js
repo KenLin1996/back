@@ -11,19 +11,23 @@ import {
   getId,
   deleteId,
   updateVoteTime,
+  updateVoteCount,
 } from "../controllers/story.js";
 
 const router = Router();
 
 router.post("/", auth.jwt, upload, create);
 router.post("/:id", auth.jwt, extendStory);
+
 router.get("/", get);
-// router.get("/all", auth.jwt, admin, getAll);
 router.get("/all", auth.jwt, getAll);
 router.get("/:id", getId);
 
 router.patch("/:id", auth.jwt, upload, edit);
-router.patch("/:id/startVote", auth.jwt, updateVoteTime);
+router.patch("/:id/updateVoteTime", auth.jwt, updateVoteTime);
+// router.patch("/:id", auth.jwt, updateVoteCount);
+router.patch("/:storyId/:extensionId", auth.jwt, updateVoteCount);
+
 router.delete("/:id", deleteId);
 
 export default router;

@@ -19,8 +19,8 @@ const StoryContentSchema = new Schema(
       // required: [true, "章節名稱必填"],
     },
     voteCount: {
-      type: Number,
-      default: 0,
+      type: [Schema.Types.ObjectId],
+      ref: "User",
       // required: [true, "投票數必填"],
     },
     parent: {

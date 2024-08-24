@@ -53,6 +53,7 @@ export const jwt = (req, res, next) => {
     }
     req.user = data.user;
     req.token = data.token;
+    
     next();
   })(req, res, next);
 };
