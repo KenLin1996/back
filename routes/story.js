@@ -5,13 +5,14 @@ import upload from "../middlewares/upload.js";
 import {
   create,
   extendStory,
-  getAll,
-  edit,
   get,
+  getAll,
   getId,
-  deleteId,
+  getExtensionStory,
+  edit,
   updateVoteTime,
   updateVoteCount,
+  deleteId,
 } from "../controllers/story.js";
 
 const router = Router();
@@ -22,6 +23,9 @@ router.post("/:id", auth.jwt, extendStory);
 router.get("/", get);
 router.get("/all", auth.jwt, getAll);
 router.get("/:id", getId);
+// router.get("/getExtension", auth.jwt, getExtensionStory);
+router.get("/getExtension/:storyId", auth.jwt, getExtensionStory);
+// router.get("/", auth.jwt, getExtensionStory);
 
 router.patch("/:id", auth.jwt, upload, edit);
 router.patch("/:id/updateVoteTime", auth.jwt, updateVoteTime);

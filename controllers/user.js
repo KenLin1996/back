@@ -68,26 +68,29 @@ export const login = async (req, res) => {
 
 export const addMark = async (req, res) => {
   try {
-    const userId = req.user._ud;
+    const userId = req.user._id;
+
     const { storyId } = req.body;
+
     const user = await User.findById(userId).populate("bookmarkStory");
-    if (user.bookmarkStory.some((book) => book._id.toString() === storyId)) {
+
+    if (user.bookmarkStory.some((book) => book.toString() === storyId)) {
       user.bookmarkStory = user.bookmarkStory.filter(
-        (book) => book._id.toString() !== storyId
+        (book) => book.toString() !== storyId
       );
     } else {
-      console.log(user);
       user.bookmarkStory.push(storyId);
     }
+
     await user.save();
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: "成功收藏",
-      result,
+    res.json({
+      hasCollection: user.bookmarkStory.some((book) => {
+        return book.toString() === storyId;
+      }),
     });
   } catch (error) {
     console.log(error);
-    req.status(500).json({ message: "伺服器錯誤" });
+    res.status(500).json({ message: "伺服器錯誤" });
   }
 };
 

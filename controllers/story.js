@@ -142,13 +142,16 @@ export const get = async (req, res) => {
 
 export const getAll = async (req, res) => {
   try {
+    const userId = req.user._id;
     const sortBy = req.query.sortBy || "createdAt";
     const sortOrder = req.query.sortOrder || "desc";
     const itemsPerPage = req.query.itemsPerPage * 1 || 10;
     const page = req.query.page * 1 || 1;
 
+
     // 只查詢所需的字段
-    const data = await Story.find({})
+    const filter = { mainAuthor: userId };
+    const data = await Story.find(filter)
       .select(
         "title state show collectionNum followNum totalVotes image author category"
       ) // 只選取這些字段
@@ -165,6 +168,7 @@ export const getAll = async (req, res) => {
         total,
       },
     });
+    // console.log(data);
   } catch (error) {
     console.log(error);
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
@@ -203,6 +207,84 @@ export const getId = async (req, res) => {
         message: "未知錯誤",
       });
     }
+  }
+};
+
+// export const getExtensionStory = async (req, res) => {
+//   try {
+//     const userId = req.user._id;
+//     console.log("User ID:", userId);
+
+//     const stories = await Story.find({ "extensions.author": userId })
+//       .populate({
+//         path: "extensions",
+//         match: { author: userId },
+//         populate: {
+//           path: "author",
+//           model: "User",
+//         },
+//       })
+//       .exec();
+
+//     console.log("Stories:", stories);
+//     console.log("Stories:", JSON.stringify(stories, null, 2));
+
+//     if (stories.length === 0) {
+//       return res.status(404).json({ message: "沒有找到您能管理的延續內容" });
+//     }
+
+//     res.json(stories);
+//   } catch (error) {
+//     console.error("Error fetching story extension:", error);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// };
+
+export const getExtensionStory = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    // console.log("User ID:", userId);
+
+    const stories = await Story.find({ "extensions.author": userId })
+      .select("title state totalVotes extensions")
+      .populate({
+        path: "extensions",
+        match: { author: userId },
+        select: "content",
+        populate: {
+          path: "author",
+          select: "name",
+        },
+      })
+      .exec();
+
+    // console.log("Stories:", stories);
+
+    // 过滤并处理 extensions 内容，将 latestContent 直接返回
+    const filteredStories = stories
+      .map((story) => {
+        const latestContent = story.extensions
+          .filter((ext) => ext.author._id.equals(userId))
+          .map((ext) => ext.content[0].latestContent)[0]; // 直接提取最新内容
+        return {
+          title: story.title,
+          state: story.state,
+          totalVotes: story.totalVotes,
+          latestContent, // 直接返回 latestContent 数组
+        };
+      })
+      // .filter((story) => story.latestContents.length > 0); // 过滤掉没有内容的故事
+      .filter((story) => story.latestContent); // 过滤掉没有内容的故事
+
+    if (filteredStories.length === 0) {
+      return res.status(404).json({ message: "沒有找到您能管理的延續內容" });
+    }
+
+    res.json(filteredStories);
+    // console.log("filteredStories:", filteredStories);
+  } catch (error) {
+    console.error("Error fetching story extension:", error);
+    res.status(500).json({ error: "Server error" });
   }
 };
 

@@ -7,7 +7,7 @@ const UserSchema = new Schema({
   avatar: {
     type: String,
     default() {
-      return;
+      return "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSIclrE8xeM_yzEKEF59fHpOvEzmfVzvX66Jg&s";
     },
   },
   email: {
