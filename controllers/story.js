@@ -148,7 +148,6 @@ export const getAll = async (req, res) => {
     const itemsPerPage = req.query.itemsPerPage * 1 || 10;
     const page = req.query.page * 1 || 1;
 
-
     // 只查詢所需的字段
     const filter = { mainAuthor: userId };
     const data = await Story.find(filter)
@@ -210,40 +209,9 @@ export const getId = async (req, res) => {
   }
 };
 
-// export const getExtensionStory = async (req, res) => {
-//   try {
-//     const userId = req.user._id;
-//     console.log("User ID:", userId);
-
-//     const stories = await Story.find({ "extensions.author": userId })
-//       .populate({
-//         path: "extensions",
-//         match: { author: userId },
-//         populate: {
-//           path: "author",
-//           model: "User",
-//         },
-//       })
-//       .exec();
-
-//     console.log("Stories:", stories);
-//     console.log("Stories:", JSON.stringify(stories, null, 2));
-
-//     if (stories.length === 0) {
-//       return res.status(404).json({ message: "沒有找到您能管理的延續內容" });
-//     }
-
-//     res.json(stories);
-//   } catch (error) {
-//     console.error("Error fetching story extension:", error);
-//     res.status(500).json({ error: "Server error" });
-//   }
-// };
-
 export const getExtensionStory = async (req, res) => {
   try {
     const userId = req.user._id;
-    // console.log("User ID:", userId);
 
     const stories = await Story.find({ "extensions.author": userId })
       .select("title state totalVotes extensions")
@@ -258,30 +226,24 @@ export const getExtensionStory = async (req, res) => {
       })
       .exec();
 
-    // console.log("Stories:", stories);
-
-    // 过滤并处理 extensions 内容，将 latestContent 直接返回
     const filteredStories = stories
       .map((story) => {
         const latestContent = story.extensions
           .filter((ext) => ext.author._id.equals(userId))
-          .map((ext) => ext.content[0].latestContent)[0]; // 直接提取最新内容
+          .map((ext) => ext.content[0].latestContent)[0];
         return {
           title: story.title,
           state: story.state,
           totalVotes: story.totalVotes,
-          latestContent, // 直接返回 latestContent 数组
+          latestContent,
         };
       })
-      // .filter((story) => story.latestContents.length > 0); // 过滤掉没有内容的故事
-      .filter((story) => story.latestContent); // 过滤掉没有内容的故事
-
+      .filter((story) => story.latestContent);
     if (filteredStories.length === 0) {
       return res.status(404).json({ message: "沒有找到您能管理的延續內容" });
     }
 
     res.json(filteredStories);
-    // console.log("filteredStories:", filteredStories);
   } catch (error) {
     console.error("Error fetching story extension:", error);
     res.status(500).json({ error: "Server error" });
@@ -355,73 +317,16 @@ export const updateVoteTime = async (req, res) => {
   }
 };
 
-// export const updateVoteCount = async (req, res) => {
-//   const { storyId, extensionId } = req.params;
-//   const { voteCountChange } = req.body;
-
-//   try {
-//     // 查找指定的故事
-//     const story = await Story.findById(storyId);
-//     if (!story) {
-//       return res.status(404).json({ message: "找不到故事" });
-//     }
-
-//     // 找到指定的擴展
-//     const extidx = story.extensions.findIndex(
-//       (ext) => ext._id.toString() === extensionId
-//     );
-//     if (extidx === -1) {
-//       return res.status(404).json({ message: "找不到此延伸故事" });
-//     }
-
-//     // const hasVotedInOtherExtension = story.extensions.some((ext) =>
-//     //   ext.voteCount.includes(req.user._id)
-//     // );
-//     const hasVotedInOtherExtension = story.extensions.some(
-//       (ext) =>
-//         ext.voteCount.includes(req.user._id) &&
-//         ext._id.toString() !== extensionId
-//     );
-
-//     if (voteCountChange === 1) {
-//       if (
-//         !story.extensions[extidx].voteCount.includes(req.user._id) &&
-//         !hasVotedInOtherExtension
-//       ) {
-//         story.extensions[extidx].voteCount.push(req.user._id);
-//       }
-//     } else if (voteCountChange === -1) {
-//       const vidx = story.extensions[extidx].voteCount.findIndex(
-//         (v) => v.toString() === req.user._id.toString()
-//       );
-//       if (vidx > -1) {
-//         story.extensions[extidx].voteCount.splice(vidx, 1);
-//       }
-//     }
-
-//     await story.save();
-//     res.status(StatusCodes.OK).json({
-//       success: true,
-//       message: "已經成功投票",
-//       hasVotedInOtherExtension,
-//     });
-//   } catch (error) {
-//     console.log(error);
-//   }
-// };
-
 export const updateVoteCount = async (req, res) => {
   const { storyId, extensionId } = req.params;
   const { voteCountChange } = req.body;
 
   try {
-    // 查找指定的故事
     const story = await Story.findById(storyId);
     if (!story) {
       return res.status(404).json({ message: "找不到故事" });
     }
 
-    // 找到指定的扩展
     const extidx = story.extensions.findIndex(
       (ext) => ext._id.toString() === extensionId
     );
@@ -429,7 +334,6 @@ export const updateVoteCount = async (req, res) => {
       return res.status(404).json({ message: "找不到此延伸故事" });
     }
 
-    // 确认用户是否在其他扩展中投过票
     const hasVotedInOtherExtension = story.extensions.some(
       (ext) =>
         ext.voteCount.includes(req.user._id) &&
@@ -456,7 +360,7 @@ export const updateVoteCount = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "已經成功投票",
-      hasVotedInOtherExtension, // 这里返回的值根据逻辑动态设置
+      hasVotedInOtherExtension,
     });
   } catch (error) {
     console.log(error);

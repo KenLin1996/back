@@ -23,13 +23,10 @@ router.post("/:id", auth.jwt, extendStory);
 router.get("/", get);
 router.get("/all", auth.jwt, getAll);
 router.get("/:id", getId);
-// router.get("/getExtension", auth.jwt, getExtensionStory);
 router.get("/getExtension/:storyId", auth.jwt, getExtensionStory);
-// router.get("/", auth.jwt, getExtensionStory);
 
 router.patch("/:id", auth.jwt, upload, edit);
 router.patch("/:id/updateVoteTime", auth.jwt, updateVoteTime);
-// router.patch("/:id", auth.jwt, updateVoteCount);
 router.patch("/:storyId/:extensionId", auth.jwt, updateVoteCount);
 
 router.delete("/:id", deleteId);
