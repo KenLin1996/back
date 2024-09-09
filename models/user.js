@@ -27,12 +27,12 @@ const UserSchema = new Schema({
     minlength: [1, "使用者暱稱長度不符"],
     maxlength: [20, "使用者暱稱長度不符"],
     unique: true,
-    validate: {
-      validator(value) {
-        return validator.isAlphanumeric(value);
-      },
-      message: "使用者帳號格式錯誤",
-    },
+    // validate: {
+    //   validator(value) {
+    //     return validator.isAlphanumeric(value);
+    //   },
+    //   message: "使用者帳號格式錯誤",
+    // },
   },
   password: {
     type: String,

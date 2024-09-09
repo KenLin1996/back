@@ -330,6 +330,7 @@ export const updateVoteCount = async (req, res) => {
     const extidx = story.extensions.findIndex(
       (ext) => ext._id.toString() === extensionId
     );
+
     if (extidx === -1) {
       return res.status(404).json({ message: "找不到此延伸故事" });
     }
@@ -364,7 +365,58 @@ export const updateVoteCount = async (req, res) => {
     });
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: "服务器错误" });
+    res.status(500).json({ message: "服務器錯誤" });
+  }
+};
+
+export const mergeHighestVotedStory = async (req, res) => {
+  const storyId = req.params.id;
+  const { extensionsId } = req.body;
+  try {
+    // 找到最高票數的延續故事
+    const story = await Story.findOne({ _id: storyId });
+
+    if (!story) {
+      return res.status(404).json({ message: "故事未找到" });
+    }
+
+    // 檢查是否已經合併過
+    if (story.hasMerged) {
+      return res.status(400).json({ message: "故事已經合併過了" });
+    }
+
+    const extension = story.extensions.id(extensionsId);
+
+    if (!extension) {
+      return res.status(404).json({ message: "延續故事未找到" });
+    }
+
+    const addLatestContent = extension.content[0]?.latestContent;
+
+    if (story.content.length > 0) {
+      // 使用 findOneAndUpdate 來更新主故事
+      const updatedStory = await Story.findOneAndUpdate(
+        { _id: storyId, "content._id": story.content[0]._id },
+        {
+          $push: { "content.$.content": addLatestContent },
+          $set: { hasMerged: true },
+        },
+        { new: true } // 返回更新後的文檔
+      );
+
+      if (!updatedStory) {
+        return res.status(404).json({ message: "主故事更新失敗" });
+      }
+
+      res
+        .status(200)
+        .json({ message: "延續故事已合併到主故事中", story: updatedStory });
+    } else {
+      res.status(400).json({ message: "主故事內容不存在" });
+    }
+  } catch (error) {
+    console.error("合併延續故事時發生錯誤", error);
+    res.status(500).json({ message: "合併延續故事時發生錯誤" });
   }
 };
 

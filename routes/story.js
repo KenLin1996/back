@@ -12,6 +12,7 @@ import {
   edit,
   updateVoteTime,
   updateVoteCount,
+  mergeHighestVotedStory,
   deleteId,
 } from "../controllers/story.js";
 
@@ -27,6 +28,8 @@ router.get("/getExtension/:storyId", auth.jwt, getExtensionStory);
 
 router.patch("/:id", auth.jwt, upload, edit);
 router.patch("/:id/updateVoteTime", auth.jwt, updateVoteTime);
+router.patch("/:id/merge", auth.jwt, mergeHighestVotedStory);
+// router.patch("/merge/:id", auth.jwt, mergeHighestVotedStory);
 router.patch("/:storyId/:extensionId", auth.jwt, updateVoteCount);
 
 router.delete("/:id", deleteId);

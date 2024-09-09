@@ -202,7 +202,8 @@ const StorySchema = new Schema(
       // required: [true, "最新內容必填"],
     },
   },
-  { timestamps: true }
+  { timestamps: true },
+  { versionKey: false }
 );
 
 export default model("Story", StorySchema);
