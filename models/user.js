@@ -67,6 +67,21 @@ const UserSchema = new Schema({
   ],
   notifies: [UserNotifySchema],
   theme: String,
+  extensionsHistory: [
+    {
+      storyId: {
+        type: Schema.Types.ObjectId,
+        ref: "Story",
+      },
+      chapterName: String,
+      content: String,
+      voteCount: [],
+      voteDate: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
 });
 
 UserSchema.pre("save", async function (next) {

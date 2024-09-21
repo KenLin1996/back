@@ -1,9 +1,10 @@
+// import mongoose from "mongoose";
 import User from "../models/user.js";
 import { StatusCodes } from "http-status-codes";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
-// 處理用戶請求
+// post
 export const create = async (req, res) => {
   try {
     // 資料庫中建立新的使用者資料
@@ -94,6 +95,7 @@ export const addMark = async (req, res) => {
   }
 };
 
+// patch
 export const extend = async (req, res) => {
   try {
     const idx = req.user.tokens.findIndex((token) => token === req.token);
@@ -109,34 +111,6 @@ export const extend = async (req, res) => {
       result: token,
     });
   } catch (error) {
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-      success: false,
-      message: "未知錯誤",
-    });
-  }
-};
-
-export const profile = (req, res) => {
-  try {
-    const userId = req.user._id;
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: "",
-      result: {
-        userId,
-        avatar: req.user.avatar,
-        email: req.user.email,
-        username: req.user.username,
-        theme: req.user.theme,
-        bookmarkStory: req.user.bookmarkStory,
-        followStory: req.user.followStory,
-        voteStory: req.user.voteStory,
-        createCharacters: req.user.createCharacters,
-        notifies: req.user.notifies,
-      },
-    });
-  } catch (error) {
-    console.log(error);
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: "未知錯誤",
@@ -204,6 +178,132 @@ export const editProfile = async (req, res) => {
   }
 };
 
+// export const updateUserVoteCount = async (req, res) => {
+//   console.log(req.body);
+//   const { userId } = req.params;
+//   const { extensionId, voteCountChange } = req.body;
+
+//   try {
+//     const userObjectId = new mongoose.Types.ObjectId(userId);
+//     const extensionObjectId = new mongoose.Types.ObjectId(extensionId);
+//     console.log(userObjectId);
+//     console.log(extensionObjectId);
+
+//     // 查找使用者
+//     const user = await User.findById(userObjectId);
+//     if (!user) {
+//       return res.status(404).json({ message: "找不到使用者" });
+//     }
+
+//     // 找到對應的 extension 投票紀錄
+//     // const extensionRecord = user.extensionsHistory.find(
+//     //   (ext) => ext.extensionId.toString() === extensionId
+//     // );
+
+//     // if (!extensionRecord) {
+//     //   return res.status(404).json({ message: "找不到該延續內容的投票紀錄" });
+//     // }
+
+//     // 測試用 找到對應的 extension 投票紀錄
+//     const extension = user.extensionsHistory.find(
+//       (ext) => ext._id.toString() === extensionObjectId.toString()
+//     );
+
+//     console.log(extension);
+//     if (!extension) {
+//       return res
+//         .status(404)
+//         .json({ message: "找不到該延伸故事於使用者歷史中" });
+//     }
+
+//     // 根據 voteCountChange 更新投票紀錄
+//     if (voteCountChange === 1) {
+//       // 新增投票，如果使用者尚未投票
+//       if (!extension.voteCount.includes(req.user._id)) {
+//         extension.voteCount.push(req.user._id);
+//       }
+//     } else if (voteCountChange === -1) {
+//       // 取消投票
+//       const voteIndex = extension.voteCount.findIndex(
+//         (voterId) => voterId.toString() === req.user._id.toString()
+//       );
+//       if (voteIndex > -1) {
+//         extension.voteCount.splice(voteIndex, 1);
+//       }
+//     }
+
+//     // 儲存使用者資料
+//     await user.save();
+
+//     res.status(200).json({ success: true, message: "投票紀錄已更新" });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: "服務器錯誤" });
+//   }
+// };
+
+// get
+export const profile = (req, res) => {
+  try {
+    const userId = req.user._id;
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: "",
+      result: {
+        userId,
+        avatar: req.user.avatar,
+        email: req.user.email,
+        username: req.user.username,
+        theme: req.user.theme,
+        bookmarkStory: req.user.bookmarkStory,
+        followStory: req.user.followStory,
+        voteStory: req.user.voteStory,
+        createCharacters: req.user.createCharacters,
+        notifies: req.user.notifies,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: "未知錯誤",
+    });
+  }
+};
+
+export const getExtensionStory = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // 使用 populate 取得 extensionsHistory 中的 storyId 資料
+    const user = await User.findById(userId).populate({
+      path: "extensionsHistory.storyId",
+      select: "title state voteCount", // 只選取故事的書名和狀態
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "使用者不存在" });
+    }
+
+    // 確保 storyId 被 populate 成功
+    const historyData = user.extensionsHistory.map((extension) => {
+      return {
+        storyTitle: extension.storyId?.title || "故事已刪除", // 確保 storyId 存在
+        storyState: extension.storyId?.state ? "完結" : "連載",
+        extensionContent: extension.content,
+        // voteCount: extension.voteCount || 0, // 確保 voteCount 有值
+        // voteCount: extension.storyId?.voteCount.length || 0, // 確保 voteCount 有值
+      };
+    });
+
+    return res.status(200).json(historyData);
+  } catch (error) {
+    console.error("取得延續紀錄時發生錯誤:", error);
+    return res.status(500).json({ error: "伺服器錯誤，請稍後再試" });
+  }
+};
+
+// delete
 export const logout = async (req, res) => {
   try {
     req.user.tokens = req.user.tokens.filter((token) => token != req.token);
@@ -219,3 +319,5 @@ export const logout = async (req, res) => {
     });
   }
 };
+
+// 測試用 getExtensionStory

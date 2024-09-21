@@ -1,4 +1,6 @@
 import Story from "../models/story.js";
+import User from "../models/user.js";
+
 import { StatusCodes } from "http-status-codes";
 import validator from "validator";
 
@@ -66,17 +68,11 @@ export const extendStory = async (req, res) => {
     const { chapterName, content, voteCount } = req.body;
     const userId = req.user._id;
 
-    // console.log("Received story extension request:", {
-    //   storyId,
-    //   chapterName,
-    //   content,
-    //   userId,
-    // });
-
     const newExtension = {
       chapterName,
       content: [{ latestContent: content }],
-      voteCount: voteCount,
+      // voteCount: voteCount,
+      voteCount: voteCount || [],
       author: userId,
     };
 
@@ -84,10 +80,30 @@ export const extendStory = async (req, res) => {
     story.extensions.push(newExtension);
 
     await story.save();
+    const extensionId = story.extensions[story.extensions.length - 1]._id;
 
-    res
-      .status(200)
-      .json({ success: true, message: "Story extension added successfully." });
+    // 在 User 模型中加入 extensionsHistory 記錄
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "使用者不存在" });
+    }
+
+    const newHistory = {
+      storyId: storyId,
+      content: content,
+      // voteCount: voteCount,
+      voteCount: voteCount || [], // 默認為空數組
+      _id: extensionId, // 確保 _id 是 ObjectId
+    };
+
+    user.extensionsHistory.push(newHistory);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message:
+        "Story extension added successfully and recorded in user history.",
+    });
   } catch (error) {
     console.log(error);
     if (error.name === "ValidationError") {
@@ -209,46 +225,46 @@ export const getId = async (req, res) => {
   }
 };
 
-export const getExtensionStory = async (req, res) => {
-  try {
-    const userId = req.user._id;
+// export const getExtensionStory = async (req, res) => {
+//   try {
+//     const userId = req.user._id;
 
-    const stories = await Story.find({ "extensions.author": userId })
-      .select("title state totalVotes extensions")
-      .populate({
-        path: "extensions",
-        match: { author: userId },
-        select: "content",
-        populate: {
-          path: "author",
-          select: "name",
-        },
-      })
-      .exec();
+//     const stories = await Story.find({ "extensions.author": userId })
+//       .select("title state totalVotes extensions")
+//       .populate({
+//         path: "extensions",
+//         match: { author: userId },
+//         select: "content",
+//         populate: {
+//           path: "author",
+//           select: "name",
+//         },
+//       })
+//       .exec();
 
-    const filteredStories = stories
-      .map((story) => {
-        const latestContent = story.extensions
-          .filter((ext) => ext.author._id.equals(userId))
-          .map((ext) => ext.content[0].latestContent)[0];
-        return {
-          title: story.title,
-          state: story.state,
-          totalVotes: story.totalVotes,
-          latestContent,
-        };
-      })
-      .filter((story) => story.latestContent);
-    if (filteredStories.length === 0) {
-      return res.status(404).json({ message: "沒有找到您能管理的延續內容" });
-    }
+//     const filteredStories = stories
+//       .map((story) => {
+//         const latestContent = story.extensions
+//           .filter((ext) => ext.author._id.equals(userId))
+//           .map((ext) => ext.content[0].latestContent)[0];
+//         return {
+//           title: story.title,
+//           state: story.state,
+//           totalVotes: story.totalVotes,
+//           latestContent,
+//         };
+//       })
+//       .filter((story) => story.latestContent);
+//     if (filteredStories.length === 0) {
+//       return res.status(404).json({ message: "沒有找到您能管理的延續內容" });
+//     }
 
-    res.json(filteredStories);
-  } catch (error) {
-    console.error("Error fetching story extension:", error);
-    res.status(500).json({ error: "Server error" });
-  }
-};
+//     res.json(filteredStories);
+//   } catch (error) {
+//     console.error("Error fetching story extension:", error);
+//     res.status(500).json({ error: "Server error" });
+//   }
+// };
 
 // patch
 export const edit = async (req, res) => {
@@ -358,6 +374,54 @@ export const updateVoteCount = async (req, res) => {
     }
 
     await story.save();
+
+    // 查找並更新 user 的 voteCount
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: "找不到使用者" });
+    }
+
+    // 打印出 user.extensionsHistory 中每個條目
+    // user.extensionsHistory.forEach((ext, idx) => {
+    //   console.log(`user.extensionsHistory[${idx}].storyId: ${ext.storyId}`);
+    //   console.log(`user.extensionsHistory[${idx}]._id: ${ext._id}`);
+    // });
+    // console.log(`傳入的 storyId: ${storyId}`);
+    // console.log(`傳入的 extensionId: ${extensionId}`);
+
+    // 查找 extensionsHistory 條目
+    const userExtension = user.extensionsHistory.find(
+      (ext) =>
+        ext.storyId.toString() === storyId && ext._id.toString() === extensionId
+    );
+
+    // 驗證是否找到正確的條目
+    if (!userExtension) {
+      console.log("找不到對應的 userExtension");
+      return res.status(404).json({ message: "找不到對應的使用者擴展記錄" });
+    }
+
+    console.log("找到的 userExtension:", userExtension);
+
+    // 檢查並更新 user 的 voteCount
+    if (voteCountChange === 1 && !hasVotedInOtherExtension) {
+      if (!userExtension.voteCount.includes(req.user._id)) {
+        userExtension.voteCount.push(req.user._id);
+        // console.log("VoteCount 增加", userExtension.voteCount);
+      }
+    } else if (voteCountChange === -1) {
+      const vidx = userExtension.voteCount.findIndex(
+        (v) => v.toString() === req.user._id.toString()
+      );
+      if (vidx > -1) {
+        userExtension.voteCount.splice(vidx, 1);
+        // console.log("VoteCount 減少", userExtension.voteCount);
+      }
+    }
+
+    // 保存 user 的更新
+    await user.save();
+
     res.status(200).json({
       success: true,
       message: "已經成功投票",
@@ -407,6 +471,10 @@ export const mergeHighestVotedStory = async (req, res) => {
       if (!updatedStory) {
         return res.status(404).json({ message: "主故事更新失敗" });
       }
+
+      // 清空 extensions 陣列
+      updatedStory.extensions = [];
+      await updatedStory.save(); // 保存變更
 
       res
         .status(200)
