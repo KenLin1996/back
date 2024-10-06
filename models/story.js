@@ -12,6 +12,10 @@ const StoryContentSchema = new Schema(
     chapterName: {
       type: String,
     },
+    chapter: {
+      type: Number, // 章節號碼
+      default: 1,
+    },
     voteCount: {
       type: [Schema.Types.ObjectId],
       ref: "User",
@@ -44,11 +48,27 @@ const StorySchema = new Schema(
     title: {
       type: String,
     },
-    chapterName: {
-      type: String,
+    chapters: {
+      type: Number, // 總章節數
+      default: 1, // 預設為1
     },
+
     totalWordCount: {
-      type: String,
+      type: Number,
+      default: 0,
+    },
+
+    currentChapterWordCount: {
+      type: Number,
+      default: 0, // 用來追蹤當前章節的累計字數
+    },
+    wordsPerChapter: {
+      type: Number, // 每章的字數限制
+      default: 0,
+    },
+    extendWordLimit: {
+      type: Number, // 延伸的字數限制
+      default: 0,
     },
     content: {
       type: [StoryContentSchema],
@@ -143,9 +163,11 @@ const StorySchema = new Schema(
     },
     state: {
       type: Boolean,
+      default: false,
     },
     show: {
       type: Boolean,
+      default: true,
     },
     image: {
       type: String,
@@ -167,10 +189,6 @@ const StorySchema = new Schema(
       type: Number,
       default: 0,
     },
-    followNum: {
-      type: Number,
-      default: 0,
-    },
     totalVotes: {
       type: Number,
       default: 0,
@@ -179,8 +197,10 @@ const StorySchema = new Schema(
       type: [StoryContentSchema],
     },
   },
-  { timestamps: true },
-  { versionKey: false }
+  {
+    timestamps: true,
+    versionKey: false,
+  }
 );
 
 export default model("Story", StorySchema);

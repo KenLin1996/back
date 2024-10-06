@@ -1,4 +1,3 @@
-// import mongoose from "mongoose";
 import User from "../models/user.js";
 import { StatusCodes } from "http-status-codes";
 import jwt from "jsonwebtoken";
@@ -122,8 +121,6 @@ export const editProfile = async (req, res) => {
   try {
     const userId = req.user._id;
     const updatedData = {};
-    // console.log(userId);
-    // console.log(req.body)
     // 根據前端傳過來的值進行更新
     if (req.body.username) {
       updatedData.username = req.body.username;
@@ -178,70 +175,6 @@ export const editProfile = async (req, res) => {
   }
 };
 
-// export const updateUserVoteCount = async (req, res) => {
-//   console.log(req.body);
-//   const { userId } = req.params;
-//   const { extensionId, voteCountChange } = req.body;
-
-//   try {
-//     const userObjectId = new mongoose.Types.ObjectId(userId);
-//     const extensionObjectId = new mongoose.Types.ObjectId(extensionId);
-//     console.log(userObjectId);
-//     console.log(extensionObjectId);
-
-//     // 查找使用者
-//     const user = await User.findById(userObjectId);
-//     if (!user) {
-//       return res.status(404).json({ message: "找不到使用者" });
-//     }
-
-//     // 找到對應的 extension 投票紀錄
-//     // const extensionRecord = user.extensionsHistory.find(
-//     //   (ext) => ext.extensionId.toString() === extensionId
-//     // );
-
-//     // if (!extensionRecord) {
-//     //   return res.status(404).json({ message: "找不到該延續內容的投票紀錄" });
-//     // }
-
-//     // 測試用 找到對應的 extension 投票紀錄
-//     const extension = user.extensionsHistory.find(
-//       (ext) => ext._id.toString() === extensionObjectId.toString()
-//     );
-
-//     console.log(extension);
-//     if (!extension) {
-//       return res
-//         .status(404)
-//         .json({ message: "找不到該延伸故事於使用者歷史中" });
-//     }
-
-//     // 根據 voteCountChange 更新投票紀錄
-//     if (voteCountChange === 1) {
-//       // 新增投票，如果使用者尚未投票
-//       if (!extension.voteCount.includes(req.user._id)) {
-//         extension.voteCount.push(req.user._id);
-//       }
-//     } else if (voteCountChange === -1) {
-//       // 取消投票
-//       const voteIndex = extension.voteCount.findIndex(
-//         (voterId) => voterId.toString() === req.user._id.toString()
-//       );
-//       if (voteIndex > -1) {
-//         extension.voteCount.splice(voteIndex, 1);
-//       }
-//     }
-
-//     // 儲存使用者資料
-//     await user.save();
-
-//     res.status(200).json({ success: true, message: "投票紀錄已更新" });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: "服務器錯誤" });
-//   }
-// };
-
 // get
 export const profile = (req, res) => {
   try {
@@ -291,8 +224,6 @@ export const getExtensionStory = async (req, res) => {
         storyTitle: extension.storyId?.title || "故事已刪除", // 確保 storyId 存在
         storyState: extension.storyId?.state ? "完結" : "連載",
         extensionContent: extension.content,
-        // voteCount: extension.voteCount || 0, // 確保 voteCount 有值
-        // voteCount: extension.storyId?.voteCount.length || 0, // 確保 voteCount 有值
       };
     });
 
@@ -319,5 +250,3 @@ export const logout = async (req, res) => {
     });
   }
 };
-
-// 測試用 getExtensionStory

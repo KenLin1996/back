@@ -1,6 +1,5 @@
 import Story from "../models/story.js";
 import User from "../models/user.js";
-
 import { StatusCodes } from "http-status-codes";
 import validator from "validator";
 
@@ -8,36 +7,39 @@ import validator from "validator";
 export const create = async (req, res) => {
   try {
     req.body.image = req.file.path;
-    // const now = Date.now();
+
     const result = await Story.create({
       mainAuthor: req.user._id,
-      // supportAuthor: req.body.supportAuthor,
+
       title: req.body.title,
-      chapterName: req.body.chapterName,
-      totalWordCount: req.body.totalWordCount,
+      totalWordCount: req.body.totalWordCount || 0,
+      chapters: req.body.chapters || 1,
+      currentChapterWordCount: req.body.currentChapterWordCount || 0,
+      wordsPerChapter: req.body.wordsPerChapter || 0, // 每章的字數限制，預設為0
+      extendWordLimit: req.body.extendWordLimit || 0, // 延伸的字數限制，預設為0
       content: [
         {
           author: req.body.author,
           content: req.body.content,
           chapterName: req.body.chapterName,
+          chapter: req.body.chapter || 1, // 章節號碼，預設為1
           voteCount: req.body.voteCount,
           parent: req.body.parent,
           main: req.body.main,
         },
       ],
+      extensions: req.body.extensions || [],
       category: req.body.category,
-      chapterLabels: req.body.chapterLabels,
-      state: req.body.state,
-      show: req.body.show,
+      chapterLabels: req.body.chapterLabels || [],
+      state: req.body.state || false, // 狀態，預設為false
+      show: req.body.show || true, // 顯示狀態，預設為true
       image: req.body.image,
-      voteTime: req.body.voteTime,
-      // voteStart: now,
-      // voteEnd: now + req.body.voteTime * 1,
-      views: req.body.views,
-      collectionNum: req.body.collectionNum,
-      followNum: req.body.followNum,
-      totalVotes: req.body.totalVotes,
+      voteTime: req.body.voteTime || 0, // 投票時間，預設為0
+      views: req.body.views || 0, // 瀏覽次數，預設為0
+      collectionNum: req.body.collectionNum, // 收藏次數，預設為0
+      totalVotes: req.body.totalVotes || 0, // 總投票數，預設為0
     });
+
     res.status(StatusCodes.OK).json({
       success: true,
       message: "",
@@ -70,7 +72,6 @@ export const extendStory = async (req, res) => {
     const newExtension = {
       chapterName,
       content: [{ latestContent: content }],
-      // voteCount: voteCount,
       voteCount: voteCount || [],
       author: userId,
     };
@@ -97,9 +98,8 @@ export const extendStory = async (req, res) => {
     const newHistory = {
       storyId: storyId,
       content: content,
-      // voteCount: voteCount,
-      voteCount: voteCount || [], // 默認為空數組
-      _id: extensionId, // 確保 _id 是 ObjectId
+      voteCount: voteCount || [], // 默認為空陣列
+      _id: extensionId,
     };
 
     user.extensionsHistory.push(newHistory);
@@ -136,7 +136,6 @@ export const get = async (req, res) => {
     const itemsPerPage = req.query.itemsPerPage * 1 || 10;
     const page = req.query.page * 1 || 1;
 
-    // 只查詢所需的字段
     const data = await Story.find({ show: true })
       .sort({ [sortBy]: sortOrder })
       .skip((page - 1) * itemsPerPage)
@@ -357,7 +356,7 @@ export const updateVoteTime = async (req, res) => {
     story.voteStart = voteStart;
     story.voteEnd = voteEnd;
 
-    await story.save(); // 保存更新到數據庫
+    await story.save(); // 保存更新到資料庫
 
     res.status(200).json({ message: "Vote time updated successfully", story });
   } catch (error) {
@@ -414,13 +413,13 @@ export const updateVoteCount = async (req, res) => {
       return res.status(404).json({ message: "找不到使用者" });
     }
 
-    // 查找 extensionsHistory 條目
+    // 查找 extensionsHistory
     const userExtension = user.extensionsHistory.find(
       (ext) =>
         ext.storyId.toString() === storyId && ext._id.toString() === extensionId
     );
 
-    // 驗證是否找到正確的條目
+    // 驗證是否找到正確的
     if (!userExtension) {
       console.log("找不到對應的 userExtension");
       return res.status(404).json({ message: "找不到對應的使用者擴展記錄" });
@@ -432,7 +431,6 @@ export const updateVoteCount = async (req, res) => {
     if (voteCountChange === 1 && !hasVotedInOtherExtension) {
       if (!userExtension.voteCount.includes(req.user._id)) {
         userExtension.voteCount.push(req.user._id);
-        // console.log("VoteCount 增加", userExtension.voteCount);
       }
     } else if (voteCountChange === -1) {
       const vidx = userExtension.voteCount.findIndex(
@@ -515,12 +513,20 @@ export const mergeHighestVotedStory = async (req, res) => {
       );
 
       if (!exists) {
+        // 計算新的 currentChapterWordCount
+        const newWordCount = (addLatestContent || "").length;
+        const newCurrentChapterWordCount =
+          story.currentChapterWordCount + newWordCount;
+
         // 使用 findOneAndUpdate 以避免版本錯誤
         const updatedStory = await Story.findOneAndUpdate(
           { _id: storyId, "content._id": story.content[0]._id },
           {
             $push: { "content.$.content": addLatestContent },
-            $set: { hasMerged: true },
+            $set: {
+              hasMerged: true,
+              currentChapterWordCount: newCurrentChapterWordCount,
+            },
           },
           { new: true } // 返回更新後的文檔
         );
@@ -552,14 +558,12 @@ export const mergeHighestVotedStory = async (req, res) => {
       .json({ message: "合併延續故事時發生錯誤", error: error.message });
   }
 };
-
 // delete
 export const deleteId = async (req, res) => {
   try {
     // 使用 validator.isMongoId 來驗證請求參數中的故事 ID 是否符合  ObjectId 格式。如果不符合，會拋出一個 ID 錯誤
     if (!validator.isMongoId(req.params.id)) throw new Error("ID");
-    // runValidators: true 確保更新時會執行模型中的驗證規則
-    // orFail(new Error('NOT FOUND')) 如果找不到匹配的故事，會拋出一個 NOT FOUND 錯誤
+
     await Story.findByIdAndDelete(req.params.id).orFail(new Error("NOT FOUND"));
 
     res.status(StatusCodes.OK).json({
