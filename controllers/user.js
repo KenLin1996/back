@@ -234,6 +234,28 @@ export const getExtensionStory = async (req, res) => {
   }
 };
 
+export const checkBookmarkStatus = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const storyId = req.params.id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "用户未找到" });
+    }
+
+    const hasCollection = user.bookmarkStory.includes(storyId);
+
+    res.status(200).json({
+      success: true,
+      hasCollection: hasCollection,
+    });
+  } catch (error) {
+    console.error("检查收藏状态失败", error);
+    res.status(500).json({ success: false, message: "服务器错误" });
+  }
+};
+
 // delete
 export const logout = async (req, res) => {
   try {

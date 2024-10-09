@@ -2,9 +2,11 @@ import { Router } from "express";
 import * as auth from "../middlewares/auth.js";
 import upload from "../middlewares/upload.js";
 // import admin from "../middlewares/admin.js";
+
 import {
   create,
   extendStory,
+  createNewChapter,
   get,
   getAll,
   getId,
@@ -22,6 +24,7 @@ const router = Router();
 
 router.post("/", auth.jwt, upload, create);
 router.post("/:id", auth.jwt, extendStory);
+router.post("/:id/newChapter", auth.jwt, createNewChapter);
 
 router.get("/getPopularStories", getPopularStories);
 router.get("/getNewestStories", getNewestStories);

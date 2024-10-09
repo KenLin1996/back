@@ -128,6 +128,74 @@ export const extendStory = async (req, res) => {
   }
 };
 
+export const createNewChapter = async (req, res) => {
+  console.log(req.body);
+
+  const storyId = req.params.id;
+  const { newContent, newChapterName } = req.body;
+
+  try {
+    const story = await Story.findOne({ _id: storyId });
+
+    if (!story) {
+      return res.status(404).json({ message: "故事未找到" });
+    }
+
+    // 計算新的 currentChapterWordCount
+    const newWordCount = newContent.length;
+
+    // 檢查是否需要換新章節
+    const shouldCreateNewChapter =
+      story.currentChapterWordCount + newWordCount > story.wordsPerChapter;
+
+    if (shouldCreateNewChapter) {
+      // 新章節資料
+      const newChapter = {
+        content: [newContent],
+        chapterName: newChapterName || "",
+        chapter: story.content[story.content.length - 1].chapter + 1, // 新章節編號
+        voteCount: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // 更新故事的章節數量和內容
+      const updatedStory = await Story.findOneAndUpdate(
+        { _id: storyId },
+        {
+          $push: { content: newChapter },
+          $set: {
+            currentChapterWordCount: newWordCount,
+          },
+        },
+        { new: true } // 返回更新後的文檔
+      );
+
+      if (!updatedStory) {
+        return res.status(404).json({ message: "主故事更新失敗" });
+      }
+
+      // 清空 extensions 陣列
+      await Story.findOneAndUpdate(
+        { _id: updatedStory._id },
+        { $set: { extensions: [] } },
+        { new: true }
+      );
+
+      res
+        .status(200)
+        .json({ message: "新章節已成功創建", story: updatedStory });
+    } else {
+      res.status(400).json({ message: "目前不需要換新章節" });
+    }
+  } catch (error) {
+    console.error("創建新章節時發生錯誤", error);
+    res
+      .status(500)
+      .json({ message: "創建新章節時發生錯誤", error: error.message });
+  }
+};
+
 // get
 export const get = async (req, res) => {
   try {
@@ -508,6 +576,7 @@ export const mergeHighestVotedStory = async (req, res) => {
     const addLatestContent = extension.content[0]?.latestContent;
 
     if (story.content.length > 0) {
+      const lastChapter = story.content[story.content.length - 1];
       const exists = story.content[0].content.some(
         (contentItem) => contentItem === addLatestContent
       );
@@ -518,16 +587,33 @@ export const mergeHighestVotedStory = async (req, res) => {
         const newCurrentChapterWordCount =
           story.currentChapterWordCount + newWordCount;
 
+        // 計算剩餘字數
+        const remainingWords =
+          story.totalWordCount -
+          (story.content.reduce(
+            (sum, chapter) => sum + chapter.content.join("").length,
+            0
+          ) +
+            newWordCount);
+
+        // 更新狀態
+        const updateFields = {
+          $push: { "content.$.content": addLatestContent },
+          $set: {
+            hasMerged: true,
+            currentChapterWordCount: newCurrentChapterWordCount,
+          },
+        };
+
+        // 如果剩餘字數為 0，將狀態更改為完結
+        if (remainingWords <= 0) {
+          updateFields.$set.state = true;
+        }
+
         // 使用 findOneAndUpdate 以避免版本錯誤
         const updatedStory = await Story.findOneAndUpdate(
-          { _id: storyId, "content._id": story.content[0]._id },
-          {
-            $push: { "content.$.content": addLatestContent },
-            $set: {
-              hasMerged: true,
-              currentChapterWordCount: newCurrentChapterWordCount,
-            },
-          },
+          { _id: storyId, "content._id": lastChapter._id },
+          updateFields,
           { new: true } // 返回更新後的文檔
         );
 
@@ -542,9 +628,11 @@ export const mergeHighestVotedStory = async (req, res) => {
           { new: true }
         );
 
-        res
-          .status(200)
-          .json({ message: "延續故事已合併到主故事中", story: updatedStory });
+        res.status(200).json({
+          message: "延續故事已合併到主故事中",
+          story: updatedStory,
+          isCompleted: remainingWords <= 0,
+        });
       } else {
         res.status(200).json({ message: "延續故事已合併到主故事中", story });
       }
