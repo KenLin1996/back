@@ -1,4 +1,5 @@
 import User from "../models/user.js";
+import Story from "../models/story.js";
 import { StatusCodes } from "http-status-codes";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
@@ -69,19 +70,28 @@ export const login = async (req, res) => {
 export const addMark = async (req, res) => {
   try {
     const userId = req.user._id;
-
     const { storyId } = req.body;
 
     const user = await User.findById(userId).populate("bookmarkStory");
+    const story = await Story.findById(storyId);
 
+    if (!story) {
+      return res.status(404).json({ message: "故事不存在" });
+    }
+
+    let hasCollection = false;
     if (user.bookmarkStory.some((book) => book.toString() === storyId)) {
       user.bookmarkStory = user.bookmarkStory.filter(
         (book) => book.toString() !== storyId
       );
+      story.collectionNum = Math.max(0, story.collectionNum - 1);
     } else {
       user.bookmarkStory.push(storyId);
+      story.collectionNum += 1;
+      hasCollection = true;
     }
 
+    await story.save();
     await user.save();
     res.json({
       hasCollection: user.bookmarkStory.some((book) => {

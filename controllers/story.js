@@ -493,8 +493,6 @@ export const updateVoteCount = async (req, res) => {
       return res.status(404).json({ message: "找不到對應的使用者擴展記錄" });
     }
 
-    console.log("找到的 userExtension:", userExtension);
-
     // 檢查並更新 user 的 voteCount
     if (voteCountChange === 1 && !hasVotedInOtherExtension) {
       if (!userExtension.voteCount.includes(req.user._id)) {
@@ -682,5 +680,30 @@ export const deleteId = async (req, res) => {
         message: "未知錯誤",
       });
     }
+  }
+};
+
+export const deleteExtensionStory = async (req, res) => {
+  const { storyId, extensionId } = req.params;
+
+  try {
+    const story = await Story.findById(storyId);
+    if (!story) {
+      return res.status(404).json({ message: "故事未找到" });
+    }
+    const updatedStory = await Story.findByIdAndUpdate(
+      storyId,
+      { $pull: { extensions: { _id: extensionId } } },
+      { new: true }
+    );
+
+    if (!updatedStory) {
+      return res.status(404).json({ message: "更新故事失败" });
+    }
+
+    res.status(200).json({ message: "Extension story deleted successfully" });
+  } catch (error) {
+    console.error("Failed to delete extension story", error);
+    res.status(500).json({ message: "Failed to delete extension story" });
   }
 };

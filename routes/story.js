@@ -18,6 +18,7 @@ import {
   clearExtensions,
   mergeHighestVotedStory,
   deleteId,
+  deleteExtensionStory,
 } from "../controllers/story.js";
 
 const router = Router();
@@ -39,5 +40,9 @@ router.patch("/:id/merge", auth.jwt, mergeHighestVotedStory);
 router.patch("/:storyId/:extensionId", auth.jwt, updateVoteCount);
 
 router.delete("/:id", deleteId);
+router.delete(
+  "/:storyId/:extensionId/deleteExtensionStory",
+  deleteExtensionStory
+);
 
 export default router;
