@@ -301,6 +301,43 @@ export const getId = async (req, res) => {
   }
 };
 
+export const getBookmarkStories = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const user = await User.findById(userId).populate({
+      path: "bookmarkStory",
+      model: "Story",
+      populate: [
+        { path: "extensions.author", select: "username" },
+        { path: "mainAuthor", select: "username" },
+      ],
+    });
+    const data = user.bookmarkStory.flat();
+
+    if (!user) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: "用户未找到",
+      });
+    }
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: "收藏故事獲取成功",
+      result: {
+        data,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: "獲取收藏的故事時發生錯誤",
+    });
+  }
+};
+
 export const getPopularStories = async (req, res) => {
   try {
     const data = await Story.find({ show: true })
@@ -610,7 +647,10 @@ export const mergeHighestVotedStory = async (req, res) => {
 
         // 使用 findOneAndUpdate 以避免版本錯誤
         const updatedStory = await Story.findOneAndUpdate(
-          { _id: storyId, "content._id": lastChapter._id },
+          {
+            _id: storyId,
+            "content._id": lastChapter._id,
+          },
           updateFields,
           { new: true } // 返回更新後的文檔
         );
@@ -644,6 +684,7 @@ export const mergeHighestVotedStory = async (req, res) => {
       .json({ message: "合併延續故事時發生錯誤", error: error.message });
   }
 };
+
 // delete
 export const deleteId = async (req, res) => {
   try {

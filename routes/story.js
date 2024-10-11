@@ -10,6 +10,7 @@ import {
   get,
   getAll,
   getId,
+  getBookmarkStories,
   getPopularStories,
   getNewestStories,
   getCompletedStories,
@@ -27,6 +28,7 @@ router.post("/", auth.jwt, upload, create);
 router.post("/:id", auth.jwt, extendStory);
 router.post("/:id/newChapter", auth.jwt, createNewChapter);
 
+router.get("/getBookmarkStories", auth.jwt, getBookmarkStories);
 router.get("/getPopularStories", getPopularStories);
 router.get("/getNewestStories", getNewestStories);
 router.get("/getCompletedStories", getCompletedStories);

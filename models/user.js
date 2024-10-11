@@ -47,12 +47,6 @@ const UserSchema = new Schema({
       ref: "Story",
     },
   ],
-  followStory: [
-    {
-      type: [Schema.Types.ObjectId],
-      ref: "Story",
-    },
-  ],
   voteStory: [
     {
       type: [Schema.Types.ObjectId],
