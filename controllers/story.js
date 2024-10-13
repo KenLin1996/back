@@ -342,7 +342,9 @@ export const getPopularStories = async (req, res) => {
   try {
     const data = await Story.find({ show: true })
       .sort({ views: -1 }) // 根據 views 進行降序排序
-      .limit(5); // 只返回前五個故事
+      .limit(5) // 只返回前五個故事
+      .populate("extensions.author", "username") // 填充 extensions.author 的 username
+      .populate("mainAuthor", "username"); // 填充 mainAuthor 的 username
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -365,7 +367,10 @@ export const getNewestStories = async (req, res) => {
   try {
     const data = await Story.find({ show: true })
       .sort({ createdAt: -1 }) // 根據 createdAt 進行降序排序
-      .limit(5); // 只返回前五個
+      .limit(5) // 只返回前五個
+      .populate("extensions.author", "username") // 填充 extensions.author 的 username
+      .populate("mainAuthor", "username"); // 填充 mainAuthor 的 username
+
     res.status(StatusCodes.OK).json({
       success: true,
       message: "最新故事獲取成功",
@@ -385,7 +390,9 @@ export const getNewestStories = async (req, res) => {
 
 export const getCompletedStories = async (req, res) => {
   try {
-    const data = await Story.find({ state: true, show: true }); // 只返回已完結的故事
+    const data = await Story.find({ state: true, show: true })
+      .populate("extensions.author", "username") // 填充 extensions.author 的 username
+      .populate("mainAuthor", "username"); // 填充 mainAuthor 的 username; // 只返回已完結的故事
     res.status(StatusCodes.OK).json({
       success: true,
       message: "完結故事獲取成功",
