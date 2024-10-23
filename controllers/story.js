@@ -129,8 +129,6 @@ export const extendStory = async (req, res) => {
 };
 
 export const createNewChapter = async (req, res) => {
-  console.log(req.body);
-
   const storyId = req.params.id;
   const { newContent, newChapterName } = req.body;
 
@@ -208,8 +206,8 @@ export const get = async (req, res) => {
       .sort({ [sortBy]: sortOrder })
       .skip((page - 1) * itemsPerPage)
       .limit(itemsPerPage)
-      .populate("extensions.author", "username")
-      .populate("mainAuthor", "username");
+      .populate("extensions.author", "username avatar")
+      .populate("mainAuthor", "username avatar");
 
     const total = await Story.estimatedDocumentCount();
     res.status(StatusCodes.OK).json({
@@ -271,7 +269,8 @@ export const getId = async (req, res) => {
 
     const result = await Story.findById(req.params.id)
       .orFail(new Error("NOT FOUND"))
-      .populate("mainAuthor", "username");
+      .populate("mainAuthor", "username avatar")
+      .populate("extensions.author", "username avatar");
 
     // 增加 views 計數
     result.views = (result.views || 0) + 1;
@@ -309,8 +308,8 @@ export const getBookmarkStories = async (req, res) => {
       path: "bookmarkStory",
       model: "Story",
       populate: [
-        { path: "extensions.author", select: "username" },
-        { path: "mainAuthor", select: "username" },
+        { path: "extensions.author", select: "username avatar" },
+        { path: "mainAuthor", select: "username avatar" },
       ],
     });
     const data = user.bookmarkStory.flat();
@@ -343,8 +342,8 @@ export const getPopularStories = async (req, res) => {
     const data = await Story.find({ show: true })
       .sort({ views: -1 }) // 根據 views 進行降序排序
       .limit(5) // 只返回前五個故事
-      .populate("extensions.author", "username") // 填充 extensions.author 的 username
-      .populate("mainAuthor", "username"); // 填充 mainAuthor 的 username
+      .populate("extensions.author", "username avatar") // 填充 extensions.author 的 username
+      .populate("mainAuthor", "username avatar"); // 填充 mainAuthor 的 username
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -368,8 +367,8 @@ export const getNewestStories = async (req, res) => {
     const data = await Story.find({ show: true })
       .sort({ createdAt: -1 }) // 根據 createdAt 進行降序排序
       .limit(5) // 只返回前五個
-      .populate("extensions.author", "username") // 填充 extensions.author 的 username
-      .populate("mainAuthor", "username"); // 填充 mainAuthor 的 username
+      .populate("extensions.author", "username avatar") // 填充 extensions.author 的 username
+      .populate("mainAuthor", "username avatar"); // 填充 mainAuthor 的 username
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -391,8 +390,8 @@ export const getNewestStories = async (req, res) => {
 export const getCompletedStories = async (req, res) => {
   try {
     const data = await Story.find({ state: true, show: true })
-      .populate("extensions.author", "username") // 填充 extensions.author 的 username
-      .populate("mainAuthor", "username"); // 填充 mainAuthor 的 username; // 只返回已完結的故事
+      .populate("extensions.author", "username avatar") // 填充 extensions.author 的 username
+      .populate("mainAuthor", "username avatar"); // 填充 mainAuthor 的 username; // 只返回已完結的故事
     res.status(StatusCodes.OK).json({
       success: true,
       message: "完結故事獲取成功",
@@ -539,15 +538,23 @@ export const updateVoteCount = async (req, res) => {
 
     // 檢查並更新 user 的 voteCount
     if (voteCountChange === 1 && !hasVotedInOtherExtension) {
-      if (!userExtension.voteCount.includes(req.user._id)) {
+      if (
+        !userExtension.voteCount.includes(req.user._id) &&
+        !user.voteStory.includes(extensionId)
+      ) {
         userExtension.voteCount.push(req.user._id);
+        user.voteStory.push(extensionId);
       }
     } else if (voteCountChange === -1) {
       const vidx = userExtension.voteCount.findIndex(
         (v) => v.toString() === req.user._id.toString()
       );
-      if (vidx > -1) {
+      const idx = user.voteStory.findIndex(
+        (v) => v.toString() === extensionId.toString()
+      );
+      if (vidx > -1 && idx > -1) {
         userExtension.voteCount.splice(vidx, 1);
+        user.voteStory.splice(idx, 1); // 從 voteStory 中移除延伸故事 ID
       }
     }
 
@@ -640,10 +647,14 @@ export const mergeHighestVotedStory = async (req, res) => {
 
         // 更新狀態
         const updateFields = {
-          $push: { "content.$.content": addLatestContent },
+          $push: {
+            "content.$.content": addLatestContent,
+            "content.$.voteCount": { $each: extension.voteCount },
+          },
           $set: {
             hasMerged: true,
             currentChapterWordCount: newCurrentChapterWordCount,
+            totalVotes: story.totalVotes + extension.voteCount.length, // 更新 totalVotes
           },
         };
 

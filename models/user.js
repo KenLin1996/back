@@ -27,12 +27,6 @@ const UserSchema = new Schema({
     minlength: [1, "使用者暱稱長度不符"],
     maxlength: [20, "使用者暱稱長度不符"],
     unique: true,
-    // validate: {
-    //   validator(value) {
-    //     return validator.isAlphanumeric(value);
-    //   },
-    //   message: "使用者帳號格式錯誤",
-    // },
   },
   password: {
     type: String,
@@ -74,9 +68,13 @@ const UserSchema = new Schema({
         type: Date,
         default: Date.now,
       },
+      isDeleted: { type: Boolean, default: false },
     },
   ],
 });
+
+// 建立索引
+UserSchema.index({ "extensionsHistory.storyId": 1 });
 
 UserSchema.pre("save", async function (next) {
   const user = this;
