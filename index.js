@@ -9,6 +9,7 @@ import rateLimit from "express-rate-limit";
 import "./passport/passport.js";
 import routeStory from "./routes/story.js";
 import routeVoteRecord from "./routes/voteRecord.js";
+import routeMessage from "./routes/message.js";
 
 const app = express();
 
@@ -59,7 +60,8 @@ app.use(mongoSanitize());
 
 app.use("/user", routeUser);
 app.use("/story", routeStory);
-app.use("/VoteRecord", routeVoteRecord);
+app.use("/voteRecord", routeVoteRecord);
+app.use("/message", routeMessage);
 
 app.all("*", (req, res) => {
   res.status(StatusCodes.NOT_FOUND).json({

@@ -1,4 +1,4 @@
-import VoteRecord from "../models/VoteRecord.js";
+import VoteRecord from "../models/voteRecord.js";
 import { StatusCodes } from "http-status-codes";
 
 // post

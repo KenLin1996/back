@@ -4,7 +4,7 @@ import {
   checkVoteRec,
   getVoteStories,
   delVoteRec,
-} from "../controllers/VoteRecord.js";
+} from "../controllers/voteRecord.js";
 import * as auth from "../middlewares/auth.js";
 
 const router = Router();
