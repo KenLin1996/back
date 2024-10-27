@@ -1,11 +1,11 @@
 import { Router } from "express";
+import * as auth from "../middlewares/auth.js";
 import {
   postVoteRec,
   checkVoteRec,
   getVoteStories,
   delVoteRec,
 } from "../controllers/voteRecord.js";
-import * as auth from "../middlewares/auth.js";
 
 const router = Router();
 
