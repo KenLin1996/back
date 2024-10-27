@@ -2,6 +2,20 @@ import passport from "passport";
 import { StatusCodes } from "http-status-codes";
 import jsonwebtoken from "jsonwebtoken";
 
+export const googleAuth = (req, res, next) => {
+  passport.authenticate("google", { session: false }, (error, user, info) => {
+    if (!user || error) {
+      res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: info?.message || "Google OAuth 驗證失敗",
+      });
+      return;
+    }
+    req.user = user;
+    next();
+  })(req, res, next);
+};
+
 export const login = (req, res, next) => {
   passport.authenticate("login", { session: false }, (error, user, info) => {
     if (!user || error) {
@@ -53,7 +67,7 @@ export const jwt = (req, res, next) => {
     }
     req.user = data.user;
     req.token = data.token;
-    
+
     next();
   })(req, res, next);
 };

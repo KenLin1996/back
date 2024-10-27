@@ -6,8 +6,13 @@ import UserNotifySchema from "./userNotify.js";
 const UserSchema = new Schema({
   avatar: {
     type: String,
+    // default() {
+    //   return "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSIclrE8xeM_yzEKEF59fHpOvEzmfVzvX66Jg&s";
+    // },
     default() {
-      return "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSIclrE8xeM_yzEKEF59fHpOvEzmfVzvX66Jg&s";
+      return this.googleId
+        ? "" // 初始為空，等待從 Google OAuth 設定
+        : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSIclrE8xeM_yzEKEF59fHpOvEzmfVzvX66Jg&s";
     },
   },
   email: {
@@ -21,6 +26,11 @@ const UserSchema = new Schema({
       message: "使用者信箱格式錯誤",
     },
   },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true, // 允許本地登入用戶不填此欄位
+  },
   username: {
     type: String,
     required: [true, "使用者暱稱必填"],
@@ -30,7 +40,13 @@ const UserSchema = new Schema({
   },
   password: {
     type: String,
-    required: [true, "使用者密碼必填"],
+    // required: [true, "使用者密碼必填"],
+    required: [
+      function () {
+        return !this.googleId;
+      },
+      "使用者密碼必填",
+    ],
   },
   tokens: {
     type: [String],
