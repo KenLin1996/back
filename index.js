@@ -45,6 +45,7 @@ app.use(
         callback(new Error("CORS"), false);
       }
     },
+    credentials: true,
   })
 );
 

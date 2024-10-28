@@ -41,12 +41,12 @@ const UserSchema = new Schema({
   password: {
     type: String,
     // required: [true, "使用者密碼必填"],
-    required: [
-      function () {
-        return !this.googleId;
-      },
-      "使用者密碼必填",
-    ],
+    // required: [
+    //   function () {
+    //     return !this.googleId;
+    //   },
+    //   "使用者密碼必填",
+    // ],
   },
   tokens: {
     type: [String],
@@ -92,21 +92,40 @@ const UserSchema = new Schema({
 // 建立索引
 UserSchema.index({ "extensionsHistory.storyId": 1 });
 
+// UserSchema.pre("save", async function (next) {
+//   const user = this;
+//   if (user.isModified("password")) {
+//     if (user.password.length < 4 || user.password.length > 20) {
+//       const error = new Error.ValidationError();
+//       error.addError(
+//         "password",
+//         new Error.ValidatorError({ message: "使用者密碼長度不符" })
+//       );
+//       next(error);
+//       return;
+//     } else {
+//       user.password = await bcrypt.hash(user.password, 10);
+//     }
+//   }
+//   next();
+// });
+
 UserSchema.pre("save", async function (next) {
   const user = this;
-  if (user.isModified("password")) {
-    if (user.password.length < 4 || user.password.length > 20) {
-      const error = new Error.ValidationError();
-      error.addError(
-        "password",
-        new Error.ValidatorError({ message: "使用者密碼長度不符" })
-      );
-      next(error);
-      return;
-    } else {
+
+  // 確保只有在沒有 googleId 的情況下才檢查密碼
+  if (!user.googleId) {
+    if (user.isModified("password")) {
+      if (!user.password) {
+        return next(new Error("使用者密碼必填"));
+      }
+      if (user.password.length < 4 || user.password.length > 20) {
+        return next(new Error("使用者密碼長度不符"));
+      }
       user.password = await bcrypt.hash(user.password, 10);
     }
   }
+
   next();
 });
 

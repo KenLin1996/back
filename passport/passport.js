@@ -18,10 +18,11 @@ passport.use(
   "google",
   new GoogleStrategy(
     {
-      clientID: process.env.VITE_GOOGLE_CLIENT_ID,
-      clientSecret: process.env.VITE_GOOGLE_CLIENT_SECRET,
-      callbackURL:
-        "https://kenlin1996.github.io/final_project_front/redirect.html", // Google 認證完成後的重定向路徑
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: "http://localhost:4000/externalAuth/google/redirect",
+      // callbackURL:
+      //   "https://kenlin1996.github.io/final_project_front/redirect.html", // Google 認證完成後的重定向路徑
       scope: ["profile", "email"], // Google OAuth 所需的範圍
       prompt: "select_account", // 請求使用者選擇 Google 帳戶
     },
@@ -33,6 +34,14 @@ passport.use(
         if (foundUser) {
           console.log("找到已註冊的使用者，跳過新增用戶步驟");
           return done(null, foundUser);
+        }
+        // 檢查電子郵件是否已存在
+        let existingEmailUser = await User.findOne({
+          email: profile.emails[0].value,
+        }).exec();
+        if (existingEmailUser) {
+          console.log("電子郵件已被其他使用者使用，無法註冊新用戶");
+          return done(null, existingEmailUser); // 返回已存在的使用者
         }
         // 若無用戶，則創建新用戶
         console.log("偵測到新用戶，開始創建新用戶資料");
