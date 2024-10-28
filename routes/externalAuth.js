@@ -5,5 +5,17 @@ import * as auth from "../middlewares/auth.js";
 const router = Router();
 
 router.get("/google", auth.googleAuth, googleAuthLog);
+// router.get(
+//   "/google",
+//   passport.authenticate("google", {
+//     scope: ["profile", "email"],
+//     prompt: "select_account",
+//   })
+// );
+
+router.get("/google/redirect", passport.authenticate("google"), (req, res) => {
+  console.log("進入redirect區域");
+  return res.redirect("/");
+});
 
 export default router;

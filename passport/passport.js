@@ -18,8 +18,8 @@ passport.use(
   "google",
   new GoogleStrategy(
     {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      clientID: process.env.VITE_GOOGLE_CLIENT_ID,
+      clientSecret: process.env.VITE_GOOGLE_CLIENT_SECRET,
       callbackURL:
         "https://kenlin1996.github.io/final_project_front/redirect.html", // Google 認證完成後的重定向路徑
       scope: ["profile", "email"], // Google OAuth 所需的範圍

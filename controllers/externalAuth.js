@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 
 export const googleAuthLog = async (req, res) => {
   try {
+    console.log("執行後端googleAuthLog");
     const token = jwt.sign({ _id: req.user._id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
