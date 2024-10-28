@@ -3,10 +3,15 @@ import jwt from "jsonwebtoken";
 
 export const googleAuthLog = async (req, res) => {
   try {
-    console.log("執行後端googleAuthLog");
+    console.log("執行後端 googleAuthLog");
+    console.log("已驗證的使用者:", req.user); // 紀錄經過驗證的使用者資訊
+
     const token = jwt.sign({ _id: req.user._id }, process.env.JWT_SECRET, {
       expiresIn: "1h",
     });
+
+    console.log("生成的 token:", token); // 紀錄生成的 token
+
     req.user.tokens.push(token);
     await req.user.save();
     res.status(StatusCodes.OK).json({
