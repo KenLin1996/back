@@ -453,8 +453,8 @@ export const edit = async (req, res) => {
 export const updateVoteTime = async (req, res) => {
   const storyId = req.params.id;
   const { voteStart, voteEnd } = req.body;
-  console.log(req.body);
-  console.log(req.params.id);
+  // console.log(req.body);
+  // console.log(req.params.id);
   try {
     // 檢查故事是否存在
     const story = await Story.findById(storyId);
