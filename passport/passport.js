@@ -27,7 +27,6 @@ passport.use(
       prompt: "select_account", // 請求使用者選擇 Google 帳戶
     },
     async (accessToken, refreshToken, profile, done) => {
-      // console.log("Google OAuth scope:", ["profile", "email"]); // 紀錄 scope
       try {
         // 尋找是否已有使用者
         let foundUser = await User.findOne({ googleID: profile.id }).exec();

@@ -17,8 +17,6 @@ router.get(
         expiresIn: "1h",
       });
 
-      // console.log("生成的 token:", token); // 紀錄生成的 token
-
       // 將 token 儲存到使用者的 tokens 陣列中
       req.user.tokens.push(token);
       await req.user.save();

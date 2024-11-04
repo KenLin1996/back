@@ -4,8 +4,6 @@ import jsonwebtoken from "jsonwebtoken";
 
 export const googleAuth = (req, res, next) => {
   passport.authenticate("google", { session: false }, (error, user, info) => {
-    // console.log("進入 googleAuth 中介軟體"); // 紀錄進入中介軟體
-
     if (!user || error) {
       res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
