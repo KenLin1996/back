@@ -10,7 +10,7 @@ import {
   checkVoteRec,
   getVoteStories,
   delVoteRec,
-} from "../controllers/voteRecord.js";
+} from "../controllers/VoteRecord.js";
 import * as auth from "../middlewares/auth.js";
 
 const router = Router();
