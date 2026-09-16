@@ -14,54 +14,61 @@ passport.deserializeUser(async (id, done) => {
   done(null, user);
 });
 
-passport.use(
-  "google",
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "http://localhost:4000/externalAuth/google/redirect",
-      // callbackURL:
-      //   "https://kenlin1996.github.io/final_project_front/redirect.html", // Google 認證完成後的重定向路徑
-      scope: ["profile", "email"], // Google OAuth 所需的範圍
-      prompt: "select_account", // 請求使用者選擇 Google 帳戶
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        // 尋找是否已有使用者
-        let foundUser = await User.findOne({ googleID: profile.id }).exec();
-        if (foundUser) {
-          console.log("找到已註冊的使用者，跳過新增用戶步驟");
-          return done(null, foundUser);
-        }
-        // 檢查電子郵件是否已存在
-        let existingEmailUser = await User.findOne({
-          email: profile.emails[0].value,
-        }).exec();
-        if (existingEmailUser) {
-          console.log("電子郵件已被其他使用者使用，無法註冊新用戶");
-          return done(null, existingEmailUser); // 返回已存在的使用者
-        }
-        // 若無用戶，則創建新用戶
-        console.log("偵測到新用戶，開始創建新用戶資料");
-        let newUser = new User({
-          username: profile.displayName,
-          googleID: profile.id,
-          avatar: profile.photos[0].value,
-          email: profile.emails[0].value,
-        });
+// TODO: Render 尚未設定 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET，Google 登入暫時停用中，有空要去 Google Cloud Console 申請並補上
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(
+    "google",
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: "http://localhost:4000/externalAuth/google/redirect",
+        // callbackURL:
+        //   "https://kenlin1996.github.io/final_project_front/redirect.html", // Google 認證完成後的重定向路徑
+        scope: ["profile", "email"], // Google OAuth 所需的範圍
+        prompt: "select_account", // 請求使用者選擇 Google 帳戶
+      },
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          // 尋找是否已有使用者
+          let foundUser = await User.findOne({ googleID: profile.id }).exec();
+          if (foundUser) {
+            console.log("找到已註冊的使用者，跳過新增用戶步驟");
+            return done(null, foundUser);
+          }
+          // 檢查電子郵件是否已存在
+          let existingEmailUser = await User.findOne({
+            email: profile.emails[0].value,
+          }).exec();
+          if (existingEmailUser) {
+            console.log("電子郵件已被其他使用者使用，無法註冊新用戶");
+            return done(null, existingEmailUser); // 返回已存在的使用者
+          }
+          // 若無用戶，則創建新用戶
+          console.log("偵測到新用戶，開始創建新用戶資料");
+          let newUser = new User({
+            username: profile.displayName,
+            googleID: profile.id,
+            avatar: profile.photos[0].value,
+            email: profile.emails[0].value,
+          });
 
-        // 儲存用戶資料
-        let savedUser = await newUser.save();
-        console.log("新用戶創建成功");
-        done(null, savedUser);
-      } catch (error) {
-        console.error("處理 Google Strategy 驗證時發生錯誤：", error);
-        done(error, null);
+          // 儲存用戶資料
+          let savedUser = await newUser.save();
+          console.log("新用戶創建成功");
+          done(null, savedUser);
+        } catch (error) {
+          console.error("處理 Google Strategy 驗證時發生錯誤：", error);
+          done(error, null);
+        }
       }
-    }
-  )
-);
+    )
+  );
+} else {
+  console.warn(
+    "未設定 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET，已略過 Google 登入功能"
+  );
+}
 
 passport.use(
   "login",
