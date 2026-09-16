@@ -517,48 +517,58 @@ export const updateVoteCount = async (req, res) => {
 
     await story.save();
 
-    // 查找並更新 user 的 voteCount
-    const user = await User.findById(req.user._id);
-    if (!user) {
+    // 更新投票者自己的 voteStory 清單（記錄「我投過哪些延伸故事」）
+    const voter = await User.findById(req.user._id);
+    if (!voter) {
       return res.status(404).json({ message: "找不到使用者" });
     }
 
-    // 查找 extensionsHistory
-    const userExtension = user.extensionsHistory.find(
+    // 找出延伸故事的作者，更新作者的 extensionsHistory（記錄「我的作品得到幾票」）
+    // 投票者不一定是作者本人，所以要分開查
+    const authorId = story.extensions[extidx].author?.toString();
+    const author =
+      authorId === req.user._id.toString()
+        ? voter
+        : authorId
+        ? await User.findById(authorId)
+        : null;
+
+    const authorExtension = author?.extensionsHistory.find(
       (ext) =>
         ext.storyId.toString() === storyId && ext._id.toString() === extensionId
     );
 
-    // 驗證是否找到正確的
-    if (!userExtension) {
-      console.log("找不到對應的 userExtension");
-      return res.status(404).json({ message: "找不到對應的使用者擴展記錄" });
-    }
-
-    // 檢查並更新 user 的 voteCount
     if (voteCountChange === 1 && !hasVotedInOtherExtension) {
+      if (!voter.voteStory.includes(extensionId)) {
+        voter.voteStory.push(extensionId);
+      }
       if (
-        !userExtension.voteCount.includes(req.user._id) &&
-        !user.voteStory.includes(extensionId)
+        authorExtension &&
+        !authorExtension.voteCount.includes(req.user._id)
       ) {
-        userExtension.voteCount.push(req.user._id);
-        user.voteStory.push(extensionId);
+        authorExtension.voteCount.push(req.user._id);
       }
     } else if (voteCountChange === -1) {
-      const vidx = userExtension.voteCount.findIndex(
-        (v) => v.toString() === req.user._id.toString()
-      );
-      const idx = user.voteStory.findIndex(
+      const idx = voter.voteStory.findIndex(
         (v) => v.toString() === extensionId.toString()
       );
-      if (vidx > -1 && idx > -1) {
-        userExtension.voteCount.splice(vidx, 1);
-        user.voteStory.splice(idx, 1); // 從 voteStory 中移除延伸故事 ID
+      if (idx > -1) {
+        voter.voteStory.splice(idx, 1);
+      }
+      if (authorExtension) {
+        const vidx = authorExtension.voteCount.findIndex(
+          (v) => v.toString() === req.user._id.toString()
+        );
+        if (vidx > -1) {
+          authorExtension.voteCount.splice(vidx, 1);
+        }
       }
     }
 
-    // 保存 user 的更新
-    await user.save();
+    await voter.save();
+    if (author && author !== voter) {
+      await author.save();
+    }
 
     res.status(200).json({
       success: true,
