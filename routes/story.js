@@ -35,9 +35,10 @@ router.get("/:id", getId);
 router.patch("/:id", auth.jwt, upload, edit);
 router.patch("/:id/finalizeVoting", auth.jwt, finalizeStoryVoting);
 
-router.delete("/:id", deleteId);
+router.delete("/:id", auth.jwt, deleteId);
 router.delete(
   "/:storyId/:extensionId/deleteExtensionStory",
+  auth.jwt,
   deleteExtensionStory
 );
 

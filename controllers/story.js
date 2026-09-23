@@ -34,7 +34,7 @@ export const create = async (req, res) => {
       category: req.body.category,
       chapterLabels: req.body.chapterLabels || [],
       state: req.body.state || false, // 狀態，預設為false
-      show: req.body.show || true, // 顯示狀態，預設為true
+      show: req.body.show ?? true, // 顯示狀態，預設為true
       image: req.body.image,
       voteTime: req.body.voteTime || 0, // 投票時間，預設為0
       views: req.body.views || 0, // 瀏覽次數，預設為0
@@ -337,10 +337,19 @@ export const getCompletedStories = async (req, res) => {
 export const edit = async (req, res) => {
   try {
     if (!validator.isMongoId(req.params.id)) throw new Error("ID");
+
+    const story = await Story.findById(req.params.id).orFail(
+      new Error("NOT FOUND")
+    );
+
+    if (story.mainAuthor.toString() !== req.user._id.toString()) {
+      throw new Error("FORBIDDEN");
+    }
+
     req.body.image = req.file?.path;
     await Story.findByIdAndUpdate(req.params.id, req.body, {
       runValidators: true,
-    }).orFail(new Error("NOT FOUND"));
+    });
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -358,6 +367,11 @@ export const edit = async (req, res) => {
         success: false,
         message: "查無故事",
       });
+    } else if (error.message === "FORBIDDEN") {
+      res.status(StatusCodes.FORBIDDEN).json({
+        success: false,
+        message: "無權編輯此故事",
+      });
     } else if (error.name === "ValidationError") {
       const key = Object.keys(error.errors)[0];
       const message = error.errors[key].message;
@@ -371,31 +385,6 @@ export const edit = async (req, res) => {
         message: "未知錯誤",
       });
     }
-  }
-};
-
-export const updateVoteTime = async (req, res) => {
-  const storyId = req.params.id;
-  const { voteStart, voteEnd } = req.body;
-
-  try {
-    // 檢查故事是否存在
-    const story = await Story.findById(storyId);
-
-    if (!story) {
-      return res.status(404).json({ message: "Story not found" });
-    }
-
-    // 更新故事的投票時間
-    story.voteStart = voteStart;
-    story.voteEnd = voteEnd;
-
-    await story.save(); // 保存更新到資料庫
-
-    res.status(200).json({ message: "Vote time updated successfully", story });
-  } catch (error) {
-    console.error("Failed to update vote time:", error);
-    res.status(500).json({ message: "Failed to update vote time" });
   }
 };
 
@@ -426,7 +415,15 @@ export const deleteId = async (req, res) => {
     // 使用 validator.isMongoId 來驗證請求參數中的故事 ID 是否符合  ObjectId 格式。如果不符合，會拋出一個 ID 錯誤
     if (!validator.isMongoId(req.params.id)) throw new Error("ID");
 
-    await Story.findByIdAndDelete(req.params.id).orFail(new Error("NOT FOUND"));
+    const story = await Story.findById(req.params.id).orFail(
+      new Error("NOT FOUND")
+    );
+
+    if (story.mainAuthor.toString() !== req.user._id.toString()) {
+      throw new Error("FORBIDDEN");
+    }
+
+    await story.deleteOne();
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -442,6 +439,11 @@ export const deleteId = async (req, res) => {
       res.status(StatusCodes.NOT_FOUND).json({
         success: false,
         message: "查無故事",
+      });
+    } else if (error.message === "FORBIDDEN") {
+      res.status(StatusCodes.FORBIDDEN).json({
+        success: false,
+        message: "無權刪除此故事",
       });
     } else if (error.name === "ValidationError") {
       const key = Object.keys(error.errors)[0];
@@ -467,6 +469,16 @@ export const deleteExtensionStory = async (req, res) => {
     if (!story) {
       return res.status(404).json({ message: "故事未找到" });
     }
+
+    const extension = story.extensions.id(extensionId);
+    if (!extension) {
+      return res.status(404).json({ message: "延續故事未找到" });
+    }
+
+    if (extension.author?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "無權刪除此延續故事" });
+    }
+
     const updatedStory = await Story.findByIdAndUpdate(
       storyId,
       { $pull: { extensions: { _id: extensionId } } },
