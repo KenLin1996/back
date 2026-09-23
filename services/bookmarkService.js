@@ -16,6 +16,7 @@ export async function toggleBookmark({ userId, storyId }) {
   const session = await mongoose.startSession();
   try {
     let hasCollection;
+    let collectionNum;
     await session.withTransaction(async () => {
       const user = await User.findById(userId).session(session);
       if (!user) throw new BookmarkError(404, "使用者不存在");
@@ -39,8 +40,10 @@ export async function toggleBookmark({ userId, storyId }) {
 
       await user.save({ session });
       await story.save({ session });
+      collectionNum = story.collectionNum;
     });
-    return { hasCollection };
+    // 回傳交易後的實際收藏數，前端直接用這個值，不自己 ++/-- 推算
+    return { hasCollection, collectionNum };
   } finally {
     await session.endSession();
   }

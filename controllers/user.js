@@ -87,11 +87,11 @@ export const login = async (req, res) => {
 export const addMark = async (req, res) => {
   try {
     const { storyId } = req.body;
-    const { hasCollection } = await toggleBookmark({
+    const { hasCollection, collectionNum } = await toggleBookmark({
       userId: req.user._id,
       storyId,
     });
-    res.json({ hasCollection });
+    res.json({ hasCollection, collectionNum });
   } catch (error) {
     handleBookmarkError(res, error);
   }
