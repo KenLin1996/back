@@ -346,8 +346,15 @@ export const edit = async (req, res) => {
       throw new Error("FORBIDDEN");
     }
 
-    req.body.image = req.file?.path;
-    await Story.findByIdAndUpdate(req.params.id, req.body, {
+    // 只允許作者修改這些欄位，其餘（投票、章節、字數、作者等）由系統邏輯維護
+    const EDITABLE_FIELDS = ["title", "state", "show"];
+    const update = {};
+    for (const field of EDITABLE_FIELDS) {
+      if (req.body[field] !== undefined) update[field] = req.body[field];
+    }
+    if (req.file?.path) update.image = req.file.path;
+
+    await Story.findByIdAndUpdate(req.params.id, update, {
       runValidators: true,
     });
 
