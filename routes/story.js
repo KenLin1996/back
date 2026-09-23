@@ -35,6 +35,19 @@ router.get("/:id", getId);
 router.patch("/:id", auth.jwt, upload, edit);
 router.patch("/:id/finalizeVoting", auth.jwt, finalizeStoryVoting);
 
+// TEMP DEBUG - 手動觸發排程掃描，確認完就會移除
+router.get("/_debug/sweep", async (req, res) => {
+  const { sweepExpiredVotes } = await import(
+    "../services/extensionMergeService.js"
+  );
+  try {
+    const results = await sweepExpiredVotes();
+    res.json({ ok: true, results });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message, stack: error.stack });
+  }
+});
+
 router.delete("/:id", deleteId);
 router.delete(
   "/:storyId/:extensionId/deleteExtensionStory",
