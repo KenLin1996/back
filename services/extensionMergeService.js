@@ -112,10 +112,15 @@ export async function finalizeVoting({ storyId }) {
 // 這樣 finalizeVoting 就不再需要依賴剛好有使用者打開該故事的頁面才會被觸發。
 // 每個故事各自 try/catch，避免其中一個失敗就讓整批掃描中斷。
 export async function sweepExpiredVotes() {
-  const expiredStories = await Story.find({
-    voteEnd: { $lt: new Date() },
-    "extensions.0": { $exists: true },
-  }).select("_id");
+  // 用 .where().lt() 查詢建構器，而不是 { voteEnd: { $lt: ... } } 這種字面 operator
+  // 物件——跟全域的 mongoose.set("sanitizeFilter", true) 搭配時，後者會把 $lt
+  // 整包當成要塞進 voteEnd 欄位的值去做 Date 轉型，直接噴 CastError。
+  const expiredStories = await Story.find()
+    .where("voteEnd")
+    .lt(new Date())
+    .where("extensions.0")
+    .exists(true)
+    .select("_id");
 
   const results = [];
   for (const { _id } of expiredStories) {
