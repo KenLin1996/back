@@ -1,0 +1,109 @@
+import mongoose from "mongoose";
+import Story from "../models/story.js";
+
+// 「投票結束後決定怎麼處理延伸故事」是一個完整的業務規則，原本被拆成三支獨立
+// endpoint（clearExtensions / merge / newChapter），由前端自己讀 extensions、算
+// 最高票、判斷章節滿不滿，再決定呼叫哪一支——這代表規則其實寫在 Vue 元件裡，
+// 後端只是被動執行前端算好的結果，而且兩邊各自判斷「要不要開新章節」的條件還不一樣。
+//
+// 現在收斂成一支 finalizeVoting()：丟 storyId 進來，其餘（沒人投票就清空、
+// 選出最高票、章節滿了要不要開新章節、要不要完結）全部由後端決定並在同一個
+// transaction 裡完成。前端不用再自己判斷，也不可能出現「前端判斷跟後端判斷
+// 不一致」的情況。
+export class ExtensionMergeError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+export async function finalizeVoting({ storyId }) {
+  const session = await mongoose.startSession();
+  try {
+    let result;
+    await session.withTransaction(async () => {
+      const story = await Story.findById(storyId).session(session);
+      if (!story) throw new ExtensionMergeError(404, "故事未找到");
+
+      if (story.extensions.length === 0) {
+        result = { action: "noop" };
+        return;
+      }
+
+      const validExtensions = story.extensions.filter(
+        (ext) => ext.voteCount.length > 0
+      );
+
+      if (validExtensions.length === 0) {
+        story.extensions = [];
+        await story.save({ session });
+        result = { action: "cleared" };
+        return;
+      }
+
+      // 最高票；同票時取先出現的那個（跟原本前端的 reduce 邏輯一致）
+      const winner = validExtensions.reduce((prev, current) =>
+        current.voteCount.length > prev.voteCount.length ? current : prev
+      );
+
+      const newContent = winner.content[0]?.latestContent || "";
+      const newWordCount = newContent.length;
+
+      if (story.content.length === 0) {
+        throw new ExtensionMergeError(400, "主故事內容不存在");
+      }
+
+      const lastChapter = story.content[story.content.length - 1];
+      const alreadyMerged = lastChapter.content.includes(newContent);
+
+      if (alreadyMerged) {
+        // 已經合併過了（例如同時有兩個請求進來，第二個在這裡發現已經做過了）
+        story.extensions = [];
+        await story.save({ session });
+        result = { action: "already_merged", story };
+        return;
+      }
+
+      const shouldCreateNewChapter =
+        story.currentChapterWordCount + newWordCount > story.wordsPerChapter;
+
+      if (shouldCreateNewChapter) {
+        story.content.push({
+          content: [newContent],
+          chapterName: winner.chapterName || "",
+          chapter: lastChapter.chapter + 1,
+          voteCount: [],
+        });
+        story.currentChapterWordCount = newWordCount;
+        story.totalVotes += winner.voteCount.length;
+        story.extensions = [];
+        await story.save({ session });
+
+        result = { action: "newChapter", story, isCompleted: false };
+      } else {
+        lastChapter.content.push(newContent);
+        lastChapter.voteCount.push(...winner.voteCount);
+        story.currentChapterWordCount += newWordCount;
+        story.totalVotes += winner.voteCount.length;
+
+        const writtenWords = story.content.reduce(
+          (sum, chapter) => sum + chapter.content.join("").length,
+          0
+        );
+        const isCompleted = writtenWords >= story.totalWordCount;
+        if (isCompleted) {
+          story.state = true;
+        }
+
+        story.hasMerged = true;
+        story.extensions = [];
+        await story.save({ session });
+
+        result = { action: "merged", story, isCompleted };
+      }
+    });
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}

@@ -3,6 +3,7 @@ import User from "../models/user.js";
 import { StatusCodes } from "http-status-codes";
 import validator from "validator";
 import { getBookmarkedStories, BookmarkError } from "../services/bookmarkService.js";
+import { finalizeVoting, ExtensionMergeError } from "../services/extensionMergeService.js";
 
 // post
 export const create = async (req, res) => {
@@ -126,72 +127,6 @@ export const extendStory = async (req, res) => {
         message: "未知錯誤",
       });
     }
-  }
-};
-
-export const createNewChapter = async (req, res) => {
-  const storyId = req.params.id;
-  const { newContent, newChapterName } = req.body;
-
-  try {
-    const story = await Story.findOne({ _id: storyId });
-
-    if (!story) {
-      return res.status(404).json({ message: "故事未找到" });
-    }
-
-    // 計算新的 currentChapterWordCount
-    const newWordCount = newContent.length;
-
-    // 檢查是否需要換新章節
-    const shouldCreateNewChapter =
-      story.currentChapterWordCount + newWordCount > story.wordsPerChapter;
-
-    if (shouldCreateNewChapter) {
-      // 新章節資料
-      const newChapter = {
-        content: [newContent],
-        chapterName: newChapterName || "",
-        chapter: story.content[story.content.length - 1].chapter + 1, // 新章節編號
-        voteCount: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      // 更新故事的章節數量和內容
-      const updatedStory = await Story.findOneAndUpdate(
-        { _id: storyId },
-        {
-          $push: { content: newChapter },
-          $set: {
-            currentChapterWordCount: newWordCount,
-          },
-        },
-        { new: true } // 返回更新後的文檔
-      );
-
-      if (!updatedStory) {
-        return res.status(404).json({ message: "主故事更新失敗" });
-      }
-
-      // 清空 extensions 陣列
-      await Story.findOneAndUpdate(
-        { _id: updatedStory._id },
-        { $set: { extensions: [] } },
-        { new: true }
-      );
-
-      res
-        .status(200)
-        .json({ message: "新章節已成功創建", story: updatedStory });
-    } else {
-      res.status(400).json({ message: "目前不需要換新章節" });
-    }
-  } catch (error) {
-    console.error("創建新章節時發生錯誤", error);
-    res
-      .status(500)
-      .json({ message: "創建新章節時發生錯誤", error: error.message });
   }
 };
 
@@ -464,134 +399,24 @@ export const updateVoteTime = async (req, res) => {
   }
 };
 
-export const clearExtensions = async (req, res) => {
-  const storyId = req.params.id;
-
+// 投票時間到了之後，決定要清空延伸故事、合併進目前章節、還是開新章節——
+// 這整套規則現在都在 services/extensionMergeService.js 裡，controller 只負責轉接。
+export const finalizeStoryVoting = async (req, res) => {
   try {
-    const story = await Story.findById(storyId); // 確保獲取最新版本
-
-    if (!story) {
-      return res.status(404).json({ message: "故事未找到" });
-    }
-
-    // 確保在更新之前獲得最新的版本
-    const updatedStory = await Story.findOneAndUpdate(
-      { _id: storyId },
-      { $set: { extensions: [] } },
-      { new: true } // 返回更新後的文檔
-    );
-
-    if (!updatedStory) {
-      return res.status(404).json({ message: "故事未找到" });
-    }
-
-    res
-      .status(200)
-      .json({ message: "延續故事已成功清空", story: updatedStory });
+    const result = await finalizeVoting({ storyId: req.params.id });
+    res.status(200).json({
+      success: true,
+      message: "投票已結算",
+      action: result.action,
+      story: result.story,
+      isCompleted: result.isCompleted ?? false,
+    });
   } catch (error) {
-    console.error("清空延續故事時發生錯誤", error);
-    res
-      .status(500)
-      .json({ message: "清空延續故事時發生錯誤", error: error.message });
-  }
-};
-
-export const mergeHighestVotedStory = async (req, res) => {
-  const storyId = req.params.id;
-  const { extensionsId } = req.body;
-
-  try {
-    const story = await Story.findOne({ _id: storyId });
-
-    if (!story) {
-      return res.status(404).json({ message: "故事未找到" });
+    if (error instanceof ExtensionMergeError) {
+      return res.status(error.status).json({ success: false, message: error.message });
     }
-
-    const extension = story.extensions.id(extensionsId);
-
-    if (!extension) {
-      return res.status(404).json({ message: "延續故事未找到" });
-    }
-
-    // 獲取最新內容
-    const addLatestContent = extension.content[0]?.latestContent;
-
-    if (story.content.length > 0) {
-      const lastChapter = story.content[story.content.length - 1];
-      const exists = story.content[0].content.some(
-        (contentItem) => contentItem === addLatestContent
-      );
-
-      if (!exists) {
-        // 計算新的 currentChapterWordCount
-        const newWordCount = (addLatestContent || "").length;
-        const newCurrentChapterWordCount =
-          story.currentChapterWordCount + newWordCount;
-
-        // 計算剩餘字數
-        const remainingWords =
-          story.totalWordCount -
-          (story.content.reduce(
-            (sum, chapter) => sum + chapter.content.join("").length,
-            0
-          ) +
-            newWordCount);
-
-        // 更新狀態
-        const updateFields = {
-          $push: {
-            "content.$.content": addLatestContent,
-            "content.$.voteCount": { $each: extension.voteCount },
-          },
-          $set: {
-            hasMerged: true,
-            currentChapterWordCount: newCurrentChapterWordCount,
-            totalVotes: story.totalVotes + extension.voteCount.length, // 更新 totalVotes
-          },
-        };
-
-        // 如果剩餘字數為 0，將狀態更改為完結
-        if (remainingWords <= 0) {
-          updateFields.$set.state = true;
-        }
-
-        // 使用 findOneAndUpdate 以避免版本錯誤
-        const updatedStory = await Story.findOneAndUpdate(
-          {
-            _id: storyId,
-            "content._id": lastChapter._id,
-          },
-          updateFields,
-          { new: true } // 返回更新後的文檔
-        );
-
-        if (!updatedStory) {
-          return res.status(404).json({ message: "主故事更新失敗" });
-        }
-
-        // 清空 extensions 陣列
-        await Story.findOneAndUpdate(
-          { _id: updatedStory._id },
-          { $set: { extensions: [] } },
-          { new: true }
-        );
-
-        res.status(200).json({
-          message: "延續故事已合併到主故事中",
-          story: updatedStory,
-          isCompleted: remainingWords <= 0,
-        });
-      } else {
-        res.status(200).json({ message: "延續故事已合併到主故事中", story });
-      }
-    } else {
-      res.status(400).json({ message: "主故事內容不存在" });
-    }
-  } catch (error) {
-    console.error("合併延續故事時發生錯誤", error);
-    res
-      .status(500)
-      .json({ message: "合併延續故事時發生錯誤", error: error.message });
+    console.error("結算投票時發生錯誤", error);
+    res.status(500).json({ success: false, message: "結算投票時發生錯誤" });
   }
 };
 

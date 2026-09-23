@@ -6,7 +6,6 @@ import upload from "../middlewares/upload.js";
 import {
   create,
   extendStory,
-  createNewChapter,
   get,
   getAll,
   getId,
@@ -15,8 +14,7 @@ import {
   getNewestStories,
   getCompletedStories,
   edit,
-  clearExtensions,
-  mergeHighestVotedStory,
+  finalizeStoryVoting,
   deleteId,
   deleteExtensionStory,
 } from "../controllers/story.js";
@@ -25,7 +23,6 @@ const router = Router();
 
 router.post("/", auth.jwt, upload, create);
 router.post("/:id", auth.jwt, extendStory);
-router.post("/:id/newChapter", auth.jwt, createNewChapter);
 
 router.get("/getBookmarkStories", auth.jwt, getBookmarkStories);
 router.get("/getPopularStories", getPopularStories);
@@ -36,8 +33,7 @@ router.get("/all", auth.jwt, getAll);
 router.get("/:id", getId);
 
 router.patch("/:id", auth.jwt, upload, edit);
-router.patch("/:id/clearExtensions", auth.jwt, clearExtensions);
-router.patch("/:id/merge", auth.jwt, mergeHighestVotedStory);
+router.patch("/:id/finalizeVoting", auth.jwt, finalizeStoryVoting);
 
 router.delete("/:id", deleteId);
 router.delete(
