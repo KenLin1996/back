@@ -2,6 +2,7 @@ import Story from "../models/story.js";
 import User from "../models/user.js";
 import { StatusCodes } from "http-status-codes";
 import validator from "validator";
+import { getBookmarkedStories, BookmarkError } from "../services/bookmarkService.js";
 
 // post
 export const create = async (req, res) => {
@@ -302,24 +303,7 @@ export const getId = async (req, res) => {
 
 export const getBookmarkStories = async (req, res) => {
   try {
-    const userId = req.user._id;
-
-    const user = await User.findById(userId).populate({
-      path: "bookmarkStory",
-      model: "Story",
-      populate: [
-        { path: "extensions.author", select: "username avatar" },
-        { path: "mainAuthor", select: "username avatar" },
-      ],
-    });
-    const data = user.bookmarkStory.flat();
-
-    if (!user) {
-      return res.status(StatusCodes.NOT_FOUND).json({
-        success: false,
-        message: "用户未找到",
-      });
-    }
+    const data = await getBookmarkedStories({ userId: req.user._id });
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -329,7 +313,12 @@ export const getBookmarkStories = async (req, res) => {
       },
     });
   } catch (error) {
-    console.log(error);
+    if (error instanceof BookmarkError) {
+      return res
+        .status(error.status)
+        .json({ success: false, message: error.message });
+    }
+    console.error(error);
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: "獲取收藏的故事時發生錯誤",

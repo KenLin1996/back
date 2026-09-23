@@ -1,8 +1,25 @@
 import User from "../models/user.js";
-import Story from "../models/story.js";
 import { StatusCodes } from "http-status-codes";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import {
+  toggleBookmark,
+  removeBookmarks,
+  isBookmarked,
+  BookmarkError,
+} from "../services/bookmarkService.js";
+
+const handleBookmarkError = (res, error) => {
+  if (error instanceof BookmarkError) {
+    return res
+      .status(error.status)
+      .json({ success: false, message: error.message });
+  }
+  console.error(error);
+  return res
+    .status(StatusCodes.INTERNAL_SERVER_ERROR)
+    .json({ success: false, message: "伺服器錯誤" });
+};
 
 // post
 export const create = async (req, res) => {
@@ -69,38 +86,14 @@ export const login = async (req, res) => {
 
 export const addMark = async (req, res) => {
   try {
-    const userId = req.user._id;
     const { storyId } = req.body;
-
-    const user = await User.findById(userId).populate("bookmarkStory");
-    const story = await Story.findById(storyId);
-
-    if (!story) {
-      return res.status(404).json({ message: "故事不存在" });
-    }
-
-    let hasCollection = false;
-    if (user.bookmarkStory.some((book) => book.toString() === storyId)) {
-      user.bookmarkStory = user.bookmarkStory.filter(
-        (book) => book.toString() !== storyId
-      );
-      story.collectionNum = Math.max(0, story.collectionNum - 1);
-    } else {
-      user.bookmarkStory.push(storyId);
-      story.collectionNum += 1;
-      hasCollection = true;
-    }
-
-    await story.save();
-    await user.save();
-    res.json({
-      hasCollection: user.bookmarkStory.some((book) => {
-        return book.toString() === storyId;
-      }),
+    const { hasCollection } = await toggleBookmark({
+      userId: req.user._id,
+      storyId,
     });
+    res.json({ hasCollection });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "伺服器錯誤" });
+    handleBookmarkError(res, error);
   }
 };
 
@@ -279,26 +272,13 @@ export const getExtensionStory = async (req, res) => {
 
 export const checkBookmarkStatus = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const storyId = req.params.id;
-
-    // console.log("req.params 的值：", req.params.id);
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "用户未找到" });
-    }
-
-    const hasCollection = user.bookmarkStory.includes(storyId);
-    // console.log("hasCollection 的值：", hasCollection);
-
-    res.status(200).json({
-      success: true,
-      hasCollection: hasCollection,
+    const hasCollection = await isBookmarked({
+      userId: req.user._id,
+      storyId: req.params.id,
     });
+    res.status(200).json({ success: true, hasCollection });
   } catch (error) {
-    console.error("检查收藏状态失败", error);
-    res.status(500).json({ success: false, message: "服务器错误" });
+    handleBookmarkError(res, error);
   }
 };
 
@@ -322,41 +302,20 @@ export const logout = async (req, res) => {
 // 在 management.vue 用於取消收藏
 export const removeBookmarkFunc = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const ids = req.body.ids._value; // 從請求主體中獲取多個故事 ID
-    const user = await User.findById(userId).populate("bookmarkStory");
+    const { ids } = req.body;
+    const { notFoundStoryIds } = await removeBookmarks({
+      userId: req.user._id,
+      storyIds: ids,
+    });
 
-    // 检查每个故事 ID 是否存在于用户的收藏中
-    const notFoundStories = [];
-
-    for (const id of ids) {
-      const story = await Story.findById(id);
-      if (!story) {
-        notFoundStories.push(id);
-        continue; // 如果故事不存在，跳过
-      }
-
-      // 移除收藏
-      if (user.bookmarkStory.some((book) => book.toString() === id)) {
-        user.bookmarkStory = user.bookmarkStory.filter(
-          (book) => book.toString() !== id
-        );
-        story.collectionNum = Math.max(0, story.collectionNum - 1);
-        await story.save(); // 更新故事的收藏数量
-      }
-    }
-
-    await user.save(); // 保存用户的更新
-
-    if (notFoundStories.length > 0) {
+    if (notFoundStoryIds.length > 0) {
       return res
         .status(404)
-        .json({ message: "部分故事不存在", notFoundStories });
+        .json({ message: "部分故事不存在", notFoundStories: notFoundStoryIds });
     }
 
     res.status(200).json({ success: true, message: "成功移除收藏" });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "伺服器錯誤" });
+    handleBookmarkError(res, error);
   }
 };
