@@ -41,8 +41,18 @@ router.get("/_debug/sweep", async (req, res) => {
     "../services/extensionMergeService.js"
   );
   try {
+    const StoryModel = (await import("../models/story.js")).default;
+    const now = new Date();
+    const all = await StoryModel.find({}).select("_id voteEnd extensions");
+    const diag = all.map((s) => ({
+      _id: s._id.toString(),
+      extLen: s.extensions.length,
+      voteEnd: s.voteEnd,
+      isPast: s.voteEnd ? s.voteEnd < now : null,
+    }));
+
     const results = await sweepExpiredVotes();
-    res.json({ ok: true, results });
+    res.json({ ok: true, now, totalStories: all.length, diag, results });
   } catch (error) {
     res.status(500).json({ ok: false, error: error.message, stack: error.stack });
   }
