@@ -10,7 +10,6 @@ import "./passport/passport.js";
 import routeStory from "./routes/story.js";
 import routeVoteRecord from "./routes/voteRecord.js";
 import routeMessage from "./routes/message.js";
-import routeExternalAuth from "./routes/externalAuth.js";
 import { sweepExpiredVotes } from "./services/extensionMergeService.js";
 
 const app = express();
@@ -62,7 +61,6 @@ app.use((_, req, res, next) => {
 app.use(mongoSanitize());
 
 app.use("/user", routeUser);
-app.use("/externalAuth", routeExternalAuth);
 app.use("/story", routeStory);
 app.use("/voteRecord", routeVoteRecord);
 app.use("/message", routeMessage);
