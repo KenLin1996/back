@@ -107,3 +107,26 @@ export async function finalizeVoting({ storyId }) {
     await session.endSession();
   }
 }
+
+// 定期掃描「投票時間已經過期、但延伸故事還沒被處理」的故事，主動幫它們結算。
+// 這樣 finalizeVoting 就不再需要依賴剛好有使用者打開該故事的頁面才會被觸發。
+// 每個故事各自 try/catch，避免其中一個失敗就讓整批掃描中斷。
+export async function sweepExpiredVotes() {
+  const expiredStories = await Story.find({
+    voteEnd: { $lt: new Date() },
+    "extensions.0": { $exists: true },
+  }).select("_id");
+
+  const results = [];
+  for (const { _id } of expiredStories) {
+    const storyId = _id.toString();
+    try {
+      const result = await finalizeVoting({ storyId });
+      results.push({ storyId, ...result });
+    } catch (error) {
+      console.error(`定期結算投票失敗 storyId=${storyId}`, error);
+      results.push({ storyId, action: "error", error: error.message });
+    }
+  }
+  return results;
+}

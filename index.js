@@ -11,6 +11,7 @@ import routeStory from "./routes/story.js";
 import routeVoteRecord from "./routes/voteRecord.js";
 import routeMessage from "./routes/message.js";
 import routeExternalAuth from "./routes/externalAuth.js";
+import { sweepExpiredVotes } from "./services/extensionMergeService.js";
 
 const app = express();
 
@@ -78,4 +79,17 @@ app.listen(process.env.PORT || 4000, async () => {
   await mongoose.connect(process.env.DB_URL);
   mongoose.set("sanitizeFilter", true);
   console.log("資料庫連線成功");
+
+  // 定期掃描投票已過期但還沒結算的故事，不再依賴使用者剛好打開頁面才觸發合併
+  const VOTE_SWEEP_INTERVAL_MS = 5 * 60 * 1000; // 5 分鐘
+  setInterval(async () => {
+    try {
+      const results = await sweepExpiredVotes();
+      if (results.length > 0) {
+        console.log(`[投票結算排程] 處理了 ${results.length} 個故事`, results);
+      }
+    } catch (error) {
+      console.error("[投票結算排程] 發生錯誤", error);
+    }
+  }, VOTE_SWEEP_INTERVAL_MS);
 });
