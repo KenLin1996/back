@@ -1,28 +1,34 @@
-import VoteRecord from "../models/VoteRecord.js";
 import { StatusCodes } from "http-status-codes";
+import VoteRecord from "../models/VoteRecord.js";
+import { castVote, retractVote, retractVoteByRecordId, VoteError } from "../services/voteService.js";
 
-// post
+const handleVoteError = (res, error) => {
+  if (error instanceof VoteError) {
+    return res.status(error.status).json({ success: false, message: error.message });
+  }
+  console.error(error);
+  return res
+    .status(StatusCodes.INTERNAL_SERVER_ERROR)
+    .json({ success: false, message: "伺服器錯誤" });
+};
+
+// post：投票（同時建立 VoteRecord、更新故事票數、更新作者統計）
 export const postVoteRec = async (req, res) => {
   try {
     const { storyId, extensionId } = req.params;
     const { content, exAuthor } = req.body;
-    const userId = req.user._id;
 
-    const voteRecord = await VoteRecord.create({
-      userId,
+    const { voteCount } = await castVote({
+      userId: req.user._id,
       storyId,
       extensionId,
-      exAuthor,
       content,
+      exAuthor,
     });
 
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: "",
-      voteRecord,
-    });
+    res.status(StatusCodes.OK).json({ success: true, message: "投票成功", voteCount });
   } catch (error) {
-    console.log(error);
+    handleVoteError(res, error);
   }
 };
 
@@ -48,7 +54,11 @@ export const getVoteStories = async (req, res) => {
       voteStories: voteStoryData,
     });
   } catch (error) {
-    console.log(error);
+    console.error(error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: "伺服器錯誤",
+    });
   }
 };
 
@@ -57,19 +67,9 @@ export const checkVoteRec = async (req, res) => {
     const { storyId, extensionId } = req.params;
     const userId = req.user._id;
 
-    const voteRecord = await VoteRecord.findOne({
-      userId,
-      storyId,
-      extensionId,
-    });
+    const voteRecord = await VoteRecord.findOne({ userId, storyId, extensionId });
 
-    if (voteRecord) {
-      // 投票紀錄存在
-      return res.status(StatusCodes.OK).json({ exists: true });
-    } else {
-      // 投票紀錄不存在
-      return res.status(StatusCodes.OK).json({ exists: false });
-    }
+    return res.status(StatusCodes.OK).json({ exists: !!voteRecord });
   } catch (error) {
     console.error("Error checking vote record:", error);
     return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
@@ -79,39 +79,39 @@ export const checkVoteRec = async (req, res) => {
   }
 };
 
-// delete
-
+// delete：取消投票（依 storyId/extensionId，同時同步更新故事票數）
 export const delVoteRec = async (req, res) => {
-  const { storyId, extensionId, id } = req.params; // 檢查是否有傳入 id 或 storyId/extensionId
-  const userId = req.user.id; // 假設你有存取用戶 ID 的機制
-
   try {
-    let result;
+    const { storyId, extensionId } = req.params;
 
-    if (id) {
-      // 如果有 id，則根據 id 和 userId 刪除紀錄
-      result = await VoteRecord.findOneAndDelete({
-        _id: id,
-        userId,
-      });
-    } else if (storyId && extensionId) {
-      // 否則根據 storyId 和 extensionId 刪除
-      result = await VoteRecord.findOneAndDelete({
-        storyId,
-        extensionId,
-        userId,
-      });
-    } else {
-      return res.status(400).json({ message: "缺少必要的參數" });
-    }
+    const { voteCount } = await retractVote({
+      userId: req.user._id,
+      storyId,
+      extensionId,
+    });
 
-    if (!result) {
-      return res.status(404).json({ message: "投票紀錄未找到" });
-    }
-
-    return res.status(200).json({ message: "投票紀錄已成功刪除" });
+    return res
+      .status(StatusCodes.OK)
+      .json({ success: true, message: "投票紀錄已成功刪除", voteCount });
   } catch (error) {
-    console.error("刪除投票紀錄時發生錯誤:", error);
-    return res.status(500).json({ message: "伺服器錯誤" });
+    handleVoteError(res, error);
+  }
+};
+
+// delete：取消投票（依「已投票的故事」管理頁面手上的 VoteRecord id，同樣同步更新故事票數）
+export const delVoteRecById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { voteCount } = await retractVoteByRecordId({
+      userId: req.user._id,
+      recordId: id,
+    });
+
+    return res
+      .status(StatusCodes.OK)
+      .json({ success: true, message: "投票紀錄已成功刪除", voteCount });
+  } catch (error) {
+    handleVoteError(res, error);
   }
 };
