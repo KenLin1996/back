@@ -196,6 +196,12 @@ const StorySchema = new Schema(
     },
     voteTime: {
       type: Number,
+      // 投票視窗長度（毫秒）。這個值一旦是 0 或負數，voteEnd 就會等於
+      // voteStart，投票視窗長度變成 0 秒——前端倒數計時器一啟動就會判定
+      // 「已過期」並立刻觸發結算，使用者只會看到投票區塊一閃而過。
+      // 前端表單本來就有 min(10) 檔著，但後端 API 之前完全沒驗證，
+      // 繞過表單（測試腳本、直接打 API）就能建出這種壞資料。
+      min: [10, "投票時間不可小於 10 毫秒"],
     },
     voteStart: {
       type: Date,
